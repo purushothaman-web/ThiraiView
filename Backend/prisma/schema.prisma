@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Movie {
+  id        Int      @id @default(autoincrement())
+  title     String
+  director  String
+  year      Int
+  userId    Int?      // make this optional
+  user      User?     @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  poster    String?
+  reviews   Review[]
+  watchlists Watchlist[]
+}
+
+
+model User {
+  id             Int       @id @default(autoincrement())
+  name           String
+  email          String    @unique
+  password       String
+  createdAt      DateTime  @default(now())
+  reviews        Review[]
+  movies         Movie[]   // back relation
+  watchlists     Watchlist[] // <-- Add back relation
+
+  // New fields
+  username       String?   @unique
+  profilePicture String?
+  bio            String?
+  isVerified     Boolean   @default(false)
+  reviewLikes  ReviewLike[]
+    // ✅ Back-relation to VerificationToken
+  verificationTokens VerificationToken[]
+}
+
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  content   String
+  rating    Int
+  createdAt DateTime @default(now())
+
+  movieId Int
+  userId  Int
+
+  movie Movie @relation(fields: [movieId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+  reviewLikes    ReviewLike[]
+}
+
+model Watchlist {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  movieId   Int
+  createdAt DateTime @default(now())
+  watched   Boolean  @default(false)
+
+  user  User  @relation(fields: [userId], references: [id])
+  movie Movie @relation(fields: [movieId], references: [id])
+
+  @@unique([userId, movieId])  // Prevent duplicates
+}
+
+model ReviewLike {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  reviewId  Int
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  review Review @relation(fields: [reviewId], references: [id])
+
+  @@unique([userId, reviewId])
+  @@index([userId, reviewId], name: "userId_reviewId") // For findUnique on this
+}
+
+model VerificationToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
