@@ -1,10 +1,8 @@
-const MOVIE_UPLOADS_DIR = process.env.MOVIE_UPLOADS_DIR || 'uploads/movies';
-const ASSETS_BASE_URL = process.env.ASSETS_BASE_URL || 'http://localhost:3000';
-
 const { PrismaClient } = require('../generated/prisma');
 const express = require('express');
 const authMiddleware = require('../middleware/auth'); 
 const upload = require('../middleware/upload');
+const { deleteImage, getFullUrl, USE_CLOUDINARY } = require('../config/cloudinary');
 
 const prisma = new PrismaClient();
 const lofm = express.Router();
@@ -14,12 +12,6 @@ const lofm = express.Router();
 lofm.get('/search', authMiddleware.optional, async (req, res) => {
   const {
     query = '',
-    sort = 'title_asc',
-    yearMin,
-    yearMax,
-    director,
-    watchedOnly,
-    myMoviesOnly,
     page = 1,
     limit = 10,
   } = req.query;
@@ -27,44 +19,13 @@ lofm.get('/search', authMiddleware.optional, async (req, res) => {
   const userId = req.user?.id;
 
   const where = {
-    AND: [
-      {
-        OR: [
-          { title: { contains: query, mode: 'insensitive' } },
-          { director: { contains: query, mode: 'insensitive' } }
-        ]
-      },
-      yearMin ? { year: { gte: parseInt(yearMin) } } : {},
-      yearMax ? { year: { lte: parseInt(yearMax) } } : {},
-      director ? { director: { equals: director } } : {},
+    OR: [
+      { title: { contains: query, mode: 'insensitive' } },
+      { director: { contains: query, mode: 'insensitive' } }
     ]
   };
 
-  if (myMoviesOnly === 'true' && userId) {
-    where.AND.push({ userId: userId });
-  }
-
-  if (watchedOnly === 'true' && userId) {
-    where.AND.push({
-      watchlists: {
-        some: {
-          userId: userId,
-          watched: true
-        }
-      }
-    });
-  }
-
-  const orderByMap = {
-    title_asc: { title: 'asc' },
-    title_desc: { title: 'desc' },
-    year_asc: { year: 'asc' },
-    year_desc: { year: 'desc' },
-    rating_asc: { avgRating: 'asc' },
-    rating_desc: { avgRating: 'desc' },
-  };
-
-  const orderBy = orderByMap[sort] || { title: 'asc' };
+  const orderBy = { title: 'asc' };
 
   const skip = (parseInt(page) - 1) * parseInt(limit);
   const take = parseInt(limit);
@@ -190,11 +151,8 @@ lofm.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Movie not found' });
     }
 
-    // Step 2: Add full poster URL if not already a full URL
-const fullPoster =
-  movie.poster?.startsWith('http://') || movie.poster?.startsWith('https://')
-    ? movie.poster
-    : `${ASSETS_BASE_URL}${movie.poster}`;
+    // Step 2: Get full URL (Cloudinary or local)
+    const fullPoster = getFullUrl(movie.poster);
 
     // Step 3: Get average rating
     const avgRatingResult = await prisma.review.aggregate({
@@ -236,14 +194,31 @@ lofm.post('/:id/poster', authMiddleware, upload.single('poster'), async (req, re
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const relativePath = `/${MOVIE_UPLOADS_DIR}/${req.file.filename}`; // ✅ Add slash manually
+    // Delete old poster if it exists
+    if (movie.poster) {
+      try {
+        await deleteImage(movie.poster);
+      } catch (deleteError) {
+        console.error('Error deleting old poster:', deleteError);
+        // Continue with upload even if deletion fails
+      }
+    }
 
-    const updatedMovie = await prisma.movie.update({
+    // Update movie with new poster URL
+    const posterPath = USE_CLOUDINARY ? req.file.path : `/${process.env.MOVIE_UPLOADS_DIR || 'uploads/movies'}/${req.file.filename}`;
+    
+    await prisma.movie.update({
       where: { id },
-      data: { poster: relativePath },
+      data: { poster: posterPath },
     });
 
-    res.json({ message: 'Poster uploaded', poster: relativePath });
+    // Return full updated movie payload for frontend to merge state
+    const updated = await prisma.movie.findUnique({
+      where: { id },
+      select: { id: true, title: true, director: true, year: true, userId: true, poster: true },
+    });
+
+    res.json({ ...updated, poster: getFullUrl(updated.poster) });
   } catch (error) {
     console.error('Poster upload error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -351,7 +326,26 @@ lofm.delete('/:id', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'You are not authorized to delete this movie' });
     }
 
-    await prisma.movie.delete({ where: { id } });
+    // Delete dependent records first to satisfy FK constraints
+    await prisma.$transaction(async (tx) => {
+      // Delete review likes for reviews of this movie
+      const reviewIds = (
+        await tx.review.findMany({ where: { movieId: id }, select: { id: true } })
+      ).map((r) => r.id);
+
+      if (reviewIds.length > 0) {
+        await tx.reviewLike.deleteMany({ where: { reviewId: { in: reviewIds } } });
+      }
+
+      // Delete reviews
+      await tx.review.deleteMany({ where: { movieId: id } });
+
+      // Delete watchlist entries
+      await tx.watchlist.deleteMany({ where: { movieId: id } });
+
+      // Finally delete the movie
+      await tx.movie.delete({ where: { id } });
+    });
 
     return res.json({ message: 'Movie deleted successfully' });
   } catch (error) {

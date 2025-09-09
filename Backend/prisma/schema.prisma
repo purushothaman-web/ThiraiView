@@ -15,39 +15,48 @@ datasource db {
 }
 
 model Movie {
-  id        Int      @id @default(autoincrement())
-  title     String
-  director  String
-  year      Int
-  userId    Int?      // make this optional
-  user      User?     @relation(fields: [userId], references: [id])
-  createdAt DateTime  @default(now())
-  poster    String?
-  reviews   Review[]
+  id         Int         @id @default(autoincrement())
+  title      String
+  director   String
+  year       Int
+  genre      String? // Add genre for recommendations
+  userId     Int? // make this optional
+  user       User?       @relation(fields: [userId], references: [id])
+  createdAt  DateTime    @default(now())
+  poster     String?
+  reviews    Review[]
   watchlists Watchlist[]
 }
 
-
 model User {
-  id             Int       @id @default(autoincrement())
-  name           String
-  email          String    @unique
-  password       String
-  createdAt      DateTime  @default(now())
-  reviews        Review[]
-  movies         Movie[]   // back relation
-  watchlists     Watchlist[] // <-- Add back relation
+  id         Int         @id @default(autoincrement())
+  name       String
+  email      String      @unique
+  password   String
+  createdAt  DateTime    @default(now())
+  reviews    Review[]
+  movies     Movie[] // back relation
+  watchlists Watchlist[] // <-- Add back relation
 
   // New fields
-  username       String?   @unique
+  username       String?      @unique
   profilePicture String?
   bio            String?
-  isVerified     Boolean   @default(false)
-  reviewLikes  ReviewLike[]
-    // ✅ Back-relation to VerificationToken
-  verificationTokens VerificationToken[]
-}
+  isVerified     Boolean      @default(false)
+  role           UserRole     @default(USER)
+  reviewLikes    ReviewLike[]
 
+  // Social features
+  followers     UserFollow[]   @relation("UserFollowers")
+  following     UserFollow[]   @relation("UserFollowing")
+  comments      Comment[]
+  notifications Notification[]
+
+  // ✅ Back-relation to VerificationToken
+  verificationTokens  VerificationToken[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+}
 
 model Review {
   id        Int      @id @default(autoincrement())
@@ -58,9 +67,10 @@ model Review {
   movieId Int
   userId  Int
 
-  movie Movie @relation(fields: [movieId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
-  reviewLikes    ReviewLike[]
+  movie       Movie        @relation(fields: [movieId], references: [id])
+  user        User         @relation(fields: [userId], references: [id])
+  reviewLikes ReviewLike[]
+  comments    Comment[]
 }
 
 model Watchlist {
@@ -73,7 +83,7 @@ model Watchlist {
   user  User  @relation(fields: [userId], references: [id])
   movie Movie @relation(fields: [movieId], references: [id])
 
-  @@unique([userId, movieId])  // Prevent duplicates
+  @@unique([userId, movieId]) // Prevent duplicates
 }
 
 model ReviewLike {
@@ -98,4 +108,106 @@ model VerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([token])
+}
+
+model RefreshToken {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  jti           String   @unique
+  tokenHash     String
+  isRevoked     Boolean  @default(false)
+  replacedByJti String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  isUsed    Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// User roles enum
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+// Follow system
+model UserFollow {
+  id          Int      @id @default(autoincrement())
+  followerId  Int
+  followingId Int
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+// Comments system
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   Int
+  reviewId Int
+  parentId Int? // For threaded comments
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review  Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([reviewId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+// Notifications system
+model Notification {
+  id        Int              @id @default(autoincrement())
+  type      NotificationType
+  message   String
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  userId    Int
+  actorId   Int? // User who triggered the notification
+  reviewId  Int? // Related review
+  commentId Int? // Related comment
+  movieId   Int? // Related movie
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// Notification types enum
+enum NotificationType {
+  FOLLOW
+  REVIEW_LIKE
+  COMMENT
+  COMMENT_REPLY
+  MOVIE_ADDED
 }

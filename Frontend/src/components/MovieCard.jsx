@@ -1,37 +1,50 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import Card, { CardBody } from "./ui/Card";
+import Badge from "./ui/Badge";
+import RatingStars from "./ui/RatingStars";
 
-const MovieCard = ({ id, title, director, year, avgRating, poster }) => {
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
+const MovieCard = ({ id, title, director, year, avgRating, poster, medium }) => {
   const navigate = useNavigate();
 
   const handleClick = () => {
     navigate(`/movies/${id}`);
   };
 
-  return (
-    <div
-      onClick={handleClick}
-      className="cursor-pointer border rounded-lg p-4 shadow hover:shadow-md transition"
-    >
-      {poster ? (
-        <img
-          src={`http://localhost:3000${poster}`}
-          alt={`${title} poster`}
-          className="w-full h-48 object-cover mb-4 rounded"
-        />
-      ) : (
-        <div className="w-full h-48 bg-gray-200 mb-4 flex items-center justify-center text-gray-400">
-          No poster available
-        </div>
-      )}
+  const posterSrc = poster?.startsWith("http") ? poster : `${BASE_URL}${poster ?? ""}`;
 
-      <h2 className="text-xl font-semibold mb-2">{title}</h2>
-      <p className="text-gray-600">Director: {director}</p>
-      <p className="text-gray-500">Year: {year}</p>
-      <p className="text-yellow-600 font-medium">
-        ⭐ {avgRating?.toFixed(1) ?? "No ratings yet"}
-      </p>
-    </div>
+  return (
+    <Card className="cursor-pointer overflow-hidden" onClick={handleClick}>
+      <div className={`relative aspect-[2/3] w-full bg-white/5 dark:bg-gray-900/40 ${medium ? 'max-h-64 md:max-h-72' : 'max-h-56 md:max-h-64'}`}>
+        {poster ? (
+          <img
+            src={posterSrc}
+            alt={`${title} poster`}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-zinc-500">No poster</div>
+        )}
+        {typeof avgRating === "number" && (
+          <div className="absolute top-2 left-2">
+            <Badge>
+              <span className="mr-1">⭐</span>
+              {avgRating.toFixed(1)}
+            </Badge>
+          </div>
+        )}
+      </div>
+      <CardBody>
+        <h2 className={`font-semibold line-clamp-1 ${medium ? 'text-xl' : 'text-lg'}`}>{title}</h2>
+        <div className="mt-1 text-sm text-zinc-400 line-clamp-1">{director} • {year}</div>
+        <div className="mt-2">
+          <RatingStars value={typeof avgRating === "number" ? avgRating : 0} />
+        </div>
+      </CardBody>
+    </Card>
   );
 };
 

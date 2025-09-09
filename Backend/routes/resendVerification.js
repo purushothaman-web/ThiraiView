@@ -19,12 +19,13 @@ router.post('/', async (req, res) => {
     // Find user by email
     const user = await prisma.user.findUnique({ where: { email } });
 
+    // To avoid account enumeration, respond with a generic success message
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.json({ message: 'If an account exists, a verification email has been sent.' });
     }
 
     if (user.isVerified) {
-      return res.status(400).json({ error: 'User is already verified' });
+      return res.json({ message: 'If an account exists, a verification email has been sent.' });
     }
 
     // Remove any existing verification tokens for this user

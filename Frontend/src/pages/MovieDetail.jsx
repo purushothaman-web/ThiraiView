@@ -1,18 +1,18 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-
-const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+import Comments from "../components/Comments";
 
 const MovieDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, token } = useContext(AuthContext);
+  const { user, token, apiClient } = useContext(AuthContext);
 
   const [movie, setMovie] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
 
   // --- Movie editing state ---
   const [isEditing, setIsEditing] = useState(false);
@@ -36,25 +36,38 @@ const MovieDetail = () => {
       try {
         setLoading(true);
 
-        const movieRes = await fetch(`${BASE_URL}/movies/${id}`);
-        if (!movieRes.ok) throw new Error("Failed to fetch movie");
-        const movieData = await movieRes.json();
+        const [movieRes, reviewsRes] = await Promise.all([
+          apiClient.get(`/movies/${id}`),
+          apiClient.get(`/reviews/movies/${id}/reviews`)
+        ]);
 
-        const reviewsRes = await fetch(`${BASE_URL}/reviews/movies/${id}/reviews`);
-        if (!reviewsRes.ok) throw new Error("Failed to fetch reviews");
-        const reviewsData = await reviewsRes.json();
-
-        setMovie(movieData);
-        setReviews(reviewsData);
+        setMovie(movieRes.data);
+        setReviews(reviewsRes.data);
       } catch (err) {
-        setError(err.message);
+        setError(err.response?.data?.error || err.message || "Failed to fetch data");
       } finally {
         setLoading(false);
       }
     };
 
     fetchMovieAndReviews();
-  }, [id]);
+  }, [id, apiClient]);
+
+  // Check if movie already in user's watchlist
+  useEffect(() => {
+    const checkWatchlist = async () => {
+      if (!token) return setIsInWatchlist(false);
+      try {
+        const response = await apiClient.get('/watchlist');
+        const items = response.data;
+        const exists = Array.isArray(items) && items.some((w) => (w.movieId === Number(id)) || (w.movie && w.movie.id === Number(id)));
+        setIsInWatchlist(Boolean(exists));
+      } catch (_) {
+        setIsInWatchlist(false);
+      }
+    };
+    checkWatchlist();
+  }, [token, id, apiClient]);
 
   // --- Movie edit functions ---
   const startEditing = () => {
@@ -73,23 +86,11 @@ const MovieDetail = () => {
 
 const addToWatchlist = async () => {
   try {
-    const res = await fetch(`${BASE_URL}/watchlist`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ movieId: movie.id }),
-    });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Failed to add to watchlist");
-    }
-
-    alert("Added to watchlist!");
+    await apiClient.post('/watchlist', { movieId: movie.id });
+    setFormSuccess("Added to watchlist");
+    setIsInWatchlist(true);
   } catch (err) {
-    alert(err.message);
+    setFormError(err.response?.data?.error || err.message || "Failed to add to watchlist");
   }
 };
 
@@ -103,76 +104,47 @@ const handleUpdate = async (e) => {
 
   try {
     // Step 1: Update movie details
-    const res = await fetch(`${BASE_URL}/movies/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        title: editTitle,
-        director: editDirector,
-        year: parseInt(editYear),
-      }),
+    const response = await apiClient.put(`/movies/${id}`, {
+      title: editTitle,
+      director: editDirector,
+      year: parseInt(editYear),
     });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      setUpdateError(data.error || "Failed to update movie");
-      return;
-    }
 
     // Step 2: If movie update is successful, upload poster (if provided)
     if (posterFile) {
       const formData = new FormData();
       formData.append("poster", posterFile);
 
-      const posterRes = await fetch(`${BASE_URL}/movies/${id}/poster`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const posterData = await posterRes.json();
-
-      if (!posterRes.ok) {
-        setPosterUploadError(posterData.error || "Poster upload failed.");
-      } else {
-        setMovie(posterData); // movie with updated poster
+      try {
+        const posterRes = await apiClient.post(`/movies/${id}/poster`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setMovie(posterRes.data); // movie with updated poster
+      } catch (posterErr) {
+        setPosterUploadError(posterErr.response?.data?.error || "Poster upload failed.");
+        setMovie(response.data); // still update with movie data
       }
     } else {
-      setMovie(data); // update without new poster
+      setMovie(response.data); // update without new poster
     }
 
     setIsEditing(false);
     setUpdateError("");
   } catch (err) {
-    setUpdateError("Something went wrong. Please try again.");
+    setUpdateError(err.response?.data?.error || "Something went wrong. Please try again.");
   }
 };
 
 
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this movie?")) return;
+    if (!confirm("Are you sure you want to delete this movie?")) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/movies/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "Failed to delete movie");
-      } else {
-        alert("Movie deleted successfully.");
-        navigate("/");
-      }
+      await apiClient.delete(`/movies/${id}`);
+      setFormSuccess("Movie deleted successfully.");
+      navigate("/");
     } catch (err) {
-      alert("Something went wrong.");
+      setFormError(err.response?.data?.error || "Something went wrong.");
     }
   };
 
@@ -186,29 +158,23 @@ const handleUpdate = async (e) => {
       setFormError("Review content cannot be empty");
       return;
     }
+    if (typeof rating !== "number" || rating < 1 || rating > 5) {
+      setFormError("Rating must be between 1 and 5");
+      return;
+    }
 
     try {
-      const res = await fetch(`${BASE_URL}/reviews/movies/${id}/reviews`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: reviewContent.trim(), rating }),
+      const response = await apiClient.post(`/reviews/movies/${id}/reviews`, {
+        content: reviewContent.trim(),
+        rating,
       });
 
-      const data = await res.json();
-
-      if (res.status === 201) {
-        setReviews([data, ...reviews]);
-        setReviewContent("");
-        setRating(5);
-        setFormSuccess("Review added successfully!");
-      } else {
-        setFormError(data.error || "Failed to add review.");
-      }
+      setReviews([response.data, ...reviews]);
+      setReviewContent("");
+      setRating(5);
+      setFormSuccess("Review added successfully!");
     } catch (err) {
-      setFormError("An error occurred.");
+      setFormError(err.response?.data?.error || "An error occurred.");
     }
   };
 
@@ -217,107 +183,73 @@ const handleUpdate = async (e) => {
       setFormError("Review content cannot be empty");
       return;
     }
+    if (typeof rating !== "number" || rating < 1 || rating > 5) {
+      setFormError("Rating must be between 1 and 5");
+      return;
+    }
 
     try {
-      const res = await fetch(`${BASE_URL}/reviews/${editingReviewId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content: reviewContent.trim(), rating }),
+      const response = await apiClient.put(`/reviews/${editingReviewId}`, {
+        content: reviewContent.trim(),
+        rating,
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        setReviews(reviews.map((r) => (r.id === editingReviewId ? { ...r, ...data } : r)));
-        setEditingReviewId(null);
-        setReviewContent("");
-        setRating(5);
-        setFormSuccess("Review updated!");
-      } else {
-        setFormError(data.error || "Failed to update review.");
-      }
+      setReviews(reviews.map((r) => (r.id === editingReviewId ? { ...r, ...response.data } : r)));
+      setEditingReviewId(null);
+      setReviewContent("");
+      setRating(5);
+      setFormSuccess("Review updated!");
     } catch (err) {
-      setFormError("Update failed.");
+      setFormError(err.response?.data?.error || "Update failed.");
     }
   };
 
   const handleDeleteReview = async (reviewId) => {
-    if (!window.confirm("Are you sure you want to delete this review?")) return;
+    if (!confirm("Are you sure you want to delete this review?")) return;
 
     try {
-      const res = await fetch(`${BASE_URL}/reviews/${reviewId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        setReviews(reviews.filter((r) => r.id !== reviewId));
-      } else {
-        const data = await res.json();
-        alert(data.error || "Failed to delete review");
-      }
+      await apiClient.delete(`/reviews/${reviewId}`);
+      setReviews(reviews.filter((r) => r.id !== reviewId));
     } catch (err) {
-      alert("Error deleting review");
+      setFormError(err.response?.data?.error || "Error deleting review");
     }
   };
 
 const handleToggleLike = async (review) => {
   if (!user) {
-    alert("Please log in to like reviews.");
+    setFormError("Please log in to like reviews.");
     return;
   }
 
   const liked = review.likedByUser;
 
   try {
-    let res;
     if (!liked) {
       // Like review
-      res = await fetch(`${BASE_URL}/reviews/${review.id}/like`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await apiClient.post(`/reviews/${review.id}/like`);
     } else {
       // Unlike review
-      res = await fetch(`${BASE_URL}/reviews/${review.id}/unlike`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    }
-
-    if (!res.ok) {
-      const data = await res.json();
-      alert(data.error || "Failed to update like.");
-      return;
+      await apiClient.delete(`/reviews/${review.id}/unlike`);
     }
 
     // Immutable update with logging
-const updatedReviews = reviews.map((r) => {
-  if (r.id === review.id) {
-    const updatedReview = {
-      ...r,
-      likedByUser: !liked,
-      likesCount: liked ? (r.likesCount || 0) - 1 : (r.likesCount || 0) + 1,
-    };
-    console.log('Updating review:', updatedReview);
-    return updatedReview;
-  }
-  return r;
-});
+    const updatedReviews = reviews.map((r) => {
+      if (r.id === review.id) {
+        const updatedReview = {
+          ...r,
+          likedByUser: !liked,
+          likesCount: liked ? (r.likesCount || 1) - 1 : (r.likesCount || 0) + 1,
+        };
+        console.log('Updating review:', updatedReview);
+        return updatedReview;
+      }
+      return r;
+    });
 
 
-    console.log('Updated reviews array:', updatedReviews);
     setReviews(updatedReviews);
-
   } catch (err) {
-    alert("Error updating like.");
+    setFormError(err.response?.data?.error || "Error updating like.");
   }
 };
 
@@ -346,7 +278,7 @@ const updatedReviews = reviews.map((r) => {
           <h1 className="text-4xl font-bold mb-4">{movie.title}</h1>
           {movie.poster && (
             <img
-              src={`${BASE_URL}${movie.poster}`}
+              src={movie.poster?.startsWith("http") ? movie.poster : `${BASE_URL}${movie.poster}`}
               alt="Movie Poster"
               className="w-full max-w-xs mb-4 rounded shadow"
             />
@@ -358,11 +290,12 @@ const updatedReviews = reviews.map((r) => {
           </p>
 
           <button
-  onClick={addToWatchlist}
-  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mt-4"
->
-   Add to Watchlist
-</button>
+            onClick={addToWatchlist}
+            disabled={isInWatchlist}
+            className={`px-4 py-2 rounded mt-4 ${isInWatchlist ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-blue-500 text-white hover:bg-blue-600"}`}
+          >
+            {isInWatchlist ? "In Watchlist" : "Add to Watchlist"}
+          </button>
 
 
           {canModifyMovie && (
@@ -498,30 +431,20 @@ const updatedReviews = reviews.map((r) => {
     <p>{review.content}</p>
     <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</p>
 
-    {/* New Like section */}
-    {user && (
-      <button
-        onClick={() => handleToggleLike(review)}
-        className={`mt-2 px-2 py-1 rounded text-sm ${
-          review.likedByUser ? "bg-blue-600 text-white" : "bg-gray-200"
-        }`}
-      >
-        {review.likedByUser ? "❤️ Liked" : "🤍 Like"} ({review.likesCount || 0})
-      </button>
-    )}
-
     {user && user.id === review.user.id && (
       <div className="absolute top-2 right-2 flex gap-2">
-<button
-  key={`${review.id}-${review.likedByUser}`}  // add likedByUser in key
-  onClick={() => handleToggleLike(review)}
-  className={`mt-2 px-2 py-1 rounded text-sm ${
-    review.likedByUser ? "bg-blue-600 text-white" : "bg-gray-200"
-  }`}
->
-  {review.likedByUser ? "❤️ Liked" : "🤍 Like"} ({review.likesCount || 0})
-</button>
-
+        <button
+          onClick={() => handleDeleteReview(review.id)}
+          className="px-2 py-1 bg-red-600 text-white rounded text-sm"
+        >
+          Delete
+        </button>
+        <button
+          onClick={() => startEditingReview(review)}
+          className="px-2 py-1 bg-gray-200 rounded text-sm"
+        >
+          Edit
+        </button>
       </div>
     )}
   </div>
@@ -530,6 +453,21 @@ const updatedReviews = reviews.map((r) => {
           )}
         </>
       )}
+
+      {/* Comments Section */}
+      {reviews.length > 0 && (
+        <div className="mt-8">
+          {reviews.map((review) => (
+            <div key={review.id} className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">
+                Comments on {review.user?.name || "Anonymous"}'s review
+              </h3>
+              <Comments reviewId={review.id} />
+            </div>
+          ))}
+        </div>
+      )}
+
     </div>
   );
 

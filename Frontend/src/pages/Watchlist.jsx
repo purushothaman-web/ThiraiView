@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../context/AuthContext";
 
 const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 export default function Watchlist() {
   const [watchlist, setWatchlist] = useState([]);
   const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem("token");
+  const { token } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!token) {
@@ -33,8 +36,11 @@ export default function Watchlist() {
     fetchWatchlist();
   }, [token]);
 
+  const [toast, setToast] = useState("");
+  const [error, setError] = useState("");
+
   const removeFromWatchlist = async (id) => {
-    if (!window.confirm("Remove from watchlist?")) return;
+    if (!confirm("Remove from watchlist?")) return;
 
     try {
       const res = await fetch(`${BASE_URL}/watchlist/${id}`, {
@@ -44,8 +50,9 @@ export default function Watchlist() {
       if (!res.ok) throw new Error("Failed to remove from watchlist");
 
       setWatchlist((prev) => prev.filter((item) => item.id !== id));
+      setToast("Removed from watchlist");
     } catch (err) {
-      alert(err.message);
+      setError(err.message);
     }
   };
 
@@ -68,7 +75,7 @@ export default function Watchlist() {
       );
     } catch (err) {
       console.error("Failed to toggle watched status:", err);
-      alert("Could not update watched status. Please try again.");
+      setError("Could not update watched status. Please try again.");
     }
   };
 
@@ -77,6 +84,8 @@ export default function Watchlist() {
 
   return (
     <div className="max-w-3xl mx-auto p-4">
+      {toast && <p className="text-green-500 mb-2">{toast}</p>}
+      {error && <p className="text-red-500 mb-2">{error}</p>}
       <h2 className="text-2xl font-bold mb-4">My Watchlist</h2>
       <ul className="space-y-4">
         {watchlist.map((item) => (
@@ -85,9 +94,10 @@ export default function Watchlist() {
             className="flex items-center bg-gray-100 rounded p-4 shadow-sm"
           >
             <img
+              onClick={() => item.movie?.id && navigate(`/movies/${item.movie.id}`)}
               src={`${BASE_URL}${item.movie?.poster || ""}`}
               alt={item.movie?.title || "Movie Poster"}
-              className="w-16 h-24 object-cover mr-4 rounded"
+              className="w-16 h-24 object-cover mr-4 rounded cursor-pointer"
             />
             <div className="flex-grow">
               <h3 className="font-semibold">

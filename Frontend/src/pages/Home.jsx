@@ -1,247 +1,153 @@
-import React, { useEffect, useState } from 'react';
-import MovieCard from '../components/MovieCard';
-
-const BASE_URL = import.meta.env.VITE_BACKEND_URL;
-
+// src/pages/Home.jsx
+import React, { useEffect, useMemo, useState, useContext } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import MovieCard from "../components/MovieCard";
+import Card, { CardBody } from "../components/ui/Card";
+import { AuthContext } from "../context/AuthContext";
+import { MovieCardSkeleton, ListSkeleton } from "../components/ui/Skeleton";
 
 const Home = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [autocompleteResults, setAutocompleteResults] = useState([]);
-
-  const [sort, setSort] = useState('title_asc');
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
   const [totalPages, setTotalPages] = useState(0);
   const [totalResults, setTotalResults] = useState(0);
 
-  // === Restore state from URL on initial load ===
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get('query') || '';
-    const s = params.get('sort') || 'title_asc';
-    const p = parseInt(params.get('page')) || 1;
-    const l = parseInt(params.get('limit')) || 10;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { apiClient, user } = useContext(AuthContext);
 
-    setSearchTerm(q);
-    setSort(s);
-    setPage(p);
-    setLimit(l);
-    fetchSearchedMovies(q, s, p, l);
+  // Slider images (auto-load from assets/slider)
+  const slides = useMemo(() => {
+    const modules = import.meta.glob("../assets/slider/*", { eager: true, as: "url" });
+    return Object.values(modules).slice(0, 3);
   }, []);
+  const quotes = [
+    "Discover stories that stay with you.",
+    "Every frame tells a tale.",
+    "Find your next favorite movie.",
+  ];
+  const [activeSlide, setActiveSlide] = useState(0);
+  useEffect(() => {
+    if (!slides.length) return;
+    const id = setInterval(() => setActiveSlide((s) => (s + 1) % slides.length), 4000);
+    return () => clearInterval(id);
+  }, [slides.length]);
 
-  // === Fetch autocomplete ===
-  const fetchAutocomplete = async (query) => {
-    if (!query) {
-      setAutocompleteResults([]);
-      return;
-    }
+  // === Fetch movies whenever query params change ===
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const query = params.get("query") || "";
+    const page = parseInt(params.get("page")) || 1;
+    const limit = 9;
 
-    try {
-      const res = await fetch(`${BASE_URL}/movies/autocomplete?query=${encodeURIComponent(query)}`);
-      if (!res.ok) throw new Error('Autocomplete fetch failed');
-      const data = await res.json();
-      setAutocompleteResults(data);
-    } catch (err) {
-      console.error('Autocomplete error:', err);
-    }
-  };
+    const fetchMovies = async () => {
+      setLoading(true);
+      setError(null);
 
-  // === Fetch search results with pagination ===
-  const fetchSearchedMovies = async (query, sortValue, pageNum = 1, perPage = limit) => {
-    setSearchLoading(true);
-    setError(null);
+      try {
+        const qs = new URLSearchParams({ query, page: String(page), limit: String(limit) });
+        const response = await apiClient.get(`/movies/search?${qs.toString()}`);
+        
+        setMovies(response.data.movies);
+        setTotalPages(response.data.totalPages);
+        setTotalResults(response.data.total);
+      } catch (err) {
+        setError(err.response?.data?.error || err.message || "Failed to fetch movies");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    try {
-      const res = await fetch(
-        `${BASE_URL}/movies/search?query=${encodeURIComponent(query)}&sort=${sortValue}&page=${pageNum}&limit=${perPage}`
-      );
-      if (!res.ok) throw new Error('Search fetch failed');
-      const data = await res.json();
+    // Add a small delay to prevent rapid-fire requests
+    const timeoutId = setTimeout(fetchMovies, 100);
+    return () => clearTimeout(timeoutId);
+  }, [location.search, apiClient]);
 
-      setMovies(data.movies);
-      setTotalPages(data.totalPages);
-      setTotalResults(data.total);
-      setPage(data.page);
-      setLimit(data.limit);
-      setAutocompleteResults([]);
-
-      // Sync URL
-      const params = new URLSearchParams({ query, sort: sortValue, page: pageNum, limit: perPage });
-      window.history.replaceState(null, '', `?${params.toString()}`);
-
-      // Scroll to top
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSearchLoading(false);
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    fetchAutocomplete(value);
-  };
-
-  const handleAutocompleteClick = (title) => {
-    setSearchTerm(title);
-    fetchSearchedMovies(title, sort, 1, limit);
-  };
-
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchSearchedMovies(searchTerm, sort, 1, limit);
-  };
-
-  const handleSortChange = (e) => {
-    const selectedSort = e.target.value;
-    setSort(selectedSort);
-    fetchSearchedMovies(searchTerm, selectedSort, 1, limit);
-  };
-
-  const handleLimitChange = (e) => {
-    const newLimit = parseInt(e.target.value);
-    setLimit(newLimit);
-    fetchSearchedMovies(searchTerm, sort, 1, newLimit);
-  };
-
+  // === Handlers ===
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      fetchSearchedMovies(searchTerm, sort, newPage, limit);
-    }
+    const params = new URLSearchParams(location.search);
+    params.set("page", newPage);
+    navigate(`/?${params.toString()}`);
   };
 
-  if (loading) return <div className="text-center mt-10 text-lg">Loading...</div>;
-  if (error) return <div className="text-center mt-10 text-red-500">{error}</div>;
+  const currentPage = parseInt(new URLSearchParams(location.search).get("page")) || 1;
+  const windowPages = (() => {
+    if (totalPages <= 3) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (currentPage <= 1) return [1, 2, 3];
+    if (currentPage >= totalPages) return [totalPages - 2, totalPages - 1, totalPages];
+    return [currentPage - 1, currentPage, currentPage + 1];
+  })();
+
+  // === UI ===
+  if (loading) return <div className="text-center mt-10 text-gray-900 dark:text-gray-100">Loading...</div>;
+  if (error) return <div className="text-center mt-10 text-red-600 dark:text-red-400">{error}</div>;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8 text-center">🎬 Movie Library</h1>
-
-      <form onSubmit={handleSearchSubmit} className="mb-6 relative max-w-md mx-auto flex gap-2">
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={handleInputChange}
-          placeholder="Search movies by title or director..."
-          className="flex-grow border border-gray-300 rounded px-4 py-2"
-        />
-
-        <select
-          value={sort}
-          onChange={handleSortChange}
-          className="border border-gray-300 rounded px-3 py-2"
-          aria-label="Sort movies"
-        >
-          <option value="title_asc">Title ↑</option>
-          <option value="title_desc">Title ↓</option>
-          <option value="year_asc">Year ↑</option>
-          <option value="year_desc">Year ↓</option>
-          <option value="rating_asc">Rating ↑</option>
-          <option value="rating_desc">Rating ↓</option>
-        </select>
-
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          aria-label="Search movies"
-        >
-          Search
-        </button>
-
-        {/* Autocomplete dropdown */}
-        {autocompleteResults.length > 0 && (
-          <ul className="absolute z-10 bg-white border border-gray-300 w-full mt-12 max-h-48 overflow-auto rounded shadow max-w-md mx-auto left-0 right-0">
-            {autocompleteResults.map((movie) => (
-              <li
-                key={movie.id}
-                onClick={() => handleAutocompleteClick(movie.title)}
-                className="cursor-pointer px-4 py-2 hover:bg-gray-200"
-              >
-                {movie.title}
-              </li>
-            ))}
-          </ul>
-        )}
-      </form>
-
-      {searchLoading && <div className="text-center mb-4">Searching...</div>}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {movies.length === 0 && <p className="text-center col-span-full">No movies found.</p>}
-
-        {movies.map((movie) => (
-          <MovieCard
-            key={movie.id}
-            id={movie.id}
-            title={movie.title}
-            director={movie.director}
-            year={movie.year}
-            avgRating={movie.avgRating}
-            poster={movie.poster}
-          />
-        ))}
+    <div className="px-4 md:px-6 max-w-7xl mx-auto">
+      <div className="mt-2 mb-6">
+        <Card>
+          <CardBody>
+            {/* Hero slider */}
+            <div className="relative overflow-hidden rounded-lg max-h-56 md:max-h-64">
+              {slides.length > 0 && (
+                <img src={slides[activeSlide]} alt="Slide" className="w-full object-cover" />
+              )}
+              <div className="absolute inset-x-0 bottom-3 text-center">
+                <span className="inline-block bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-gray-100 px-3 py-1 rounded-lg text-sm backdrop-blur-sm">{quotes[activeSlide % quotes.length]}</span>
+              </div>
+              <div className="absolute right-3 bottom-3 flex gap-2">
+                {slides.map((_, i) => (
+                  <button key={i} onClick={() => setActiveSlide(i)} className={`h-2 w-2 rounded-full transition-colors duration-200 ${i === activeSlide ? "bg-blue-600 dark:bg-blue-400" : "bg-gray-400/50 dark:bg-gray-600/50"}`} aria-label={`Go to slide ${i+1}`} />
+                ))}
+              </div>
+            </div>
+          </CardBody>
+        </Card>
       </div>
 
-      {/* Pagination Controls */}
+      {loading ? (
+        <ListSkeleton count={6} ItemComponent={MovieCardSkeleton} />
+      ) : movies.length === 0 ? (
+        <Card><CardBody><p className="text-center text-gray-600 dark:text-gray-400">No movies found.</p></CardBody></Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {movies.map((movie) => (
+            <MovieCard key={movie.id} {...movie} medium />
+          ))}
+        </div>
+      )}
+
       {totalResults > 0 && (
-        <div className="flex items-center justify-between mt-6 flex-wrap gap-4">
-          <div>
-            Showing {(page - 1) * limit + 1}–{Math.min(page * limit, totalResults)} of {totalResults} results
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handlePageChange(page - 1)}
-              disabled={page === 1}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+        <div className="flex items-center justify-center mt-8 gap-2">
+          <button 
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))} 
+            disabled={currentPage === 1} 
+            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          >
+            Prev
+          </button>
+          {windowPages.map((p) => (
+            <button 
+              key={p} 
+              onClick={() => handlePageChange(p)} 
+              className={`px-3 py-1 rounded-lg border transition-colors duration-200 ${
+                p === currentPage 
+                  ? "bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500" 
+                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+              }`}
             >
-              Prev
+              {p}
             </button>
-
-            {[...Array(totalPages)].map((_, idx) => {
-              const pageNum = idx + 1;
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`px-3 py-1 rounded ${
-                    pageNum === page ? 'bg-blue-600 text-white' : 'bg-gray-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={() => handlePageChange(page + 1)}
-              disabled={page === totalPages}
-              className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
-
-          <div>
-            <label className="mr-2">Limit:</label>
-            <select
-              value={limit}
-              onChange={handleLimitChange}
-              className="border border-gray-300 rounded px-2 py-1"
-            >
-              <option value={6}>6</option>
-              <option value={9}>9</option>
-              <option value={12}>12</option>
-            </select>
-          </div>
+          ))}
+          <button 
+            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} 
+            disabled={currentPage === totalPages} 
+            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

@@ -6,16 +6,31 @@ const { PrismaClient } = require('../generated/prisma');
 const prisma = new PrismaClient();
 const authenticate = require("../middleware/auth"); // JWT middleware
 const upload = require("../middleware/uploadProfile"); // multer config
-
-const path = require("path");
-const fs = require("fs");
-
-const UPLOADS_DIR = process.env.PROFILE_UPLOADS_DIR || 'uploads/profiles';
-const ASSETS_BASE_URL = process.env.ASSETS_BASE_URL || 'http://localhost:3000';
+const { deleteImage, getFullUrl, USE_CLOUDINARY } = require('../config/cloudinary');
 
 // GET /profile
 router.get("/", authenticate, async (req, res) => {
   try {
+    const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL;
+    // If this is the default admin, return a static profile
+    if (
+      (req.user && req.user.isDefaultAdmin) ||
+      (req.user && DEFAULT_ADMIN_EMAIL && req.user.email === DEFAULT_ADMIN_EMAIL)
+    ) {
+      return res.json({
+        id: 0,
+        email: DEFAULT_ADMIN_EMAIL,
+        username: 'admin',
+        name: 'Default Admin',
+        bio: 'Superuser for ThiraiView',
+        profilePicture: null,
+        isVerified: true,
+        watchlistCount: 0,
+        role: 'ADMIN',
+        isDefaultAdmin: true
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       select: {
@@ -129,15 +144,16 @@ router.put("/", authenticate, upload.single("profilePicture"), async (req, res) 
     if (req.file) {
       // Delete old profile picture if exists
       if (profilePicturePath) {
-        // Convert URL path to absolute filesystem path
-        const oldFilePath = path.join(__dirname, '..', profilePicturePath.replace(`${ASSETS_BASE_URL}`, '').replace(/^\//, ''));
-        if (fs.existsSync(oldFilePath)) {
-          fs.unlinkSync(oldFilePath);
+        try {
+          await deleteImage(profilePicturePath);
+        } catch (deleteError) {
+          console.error('Error deleting old profile picture:', deleteError);
+          // Continue with upload even if deletion fails
         }
       }
 
-      // Construct new profile picture URL path for frontend usage
-      profilePicturePath = `${ASSETS_BASE_URL}/${UPLOADS_DIR}/${req.file.filename}`;
+      // Set new profile picture path
+      profilePicturePath = USE_CLOUDINARY ? req.file.path : `/${process.env.PROFILE_UPLOADS_DIR || 'uploads/profiles'}/${req.file.filename}`;
     }
 
     const updatedUser = await prisma.user.update({
@@ -157,10 +173,44 @@ router.put("/", authenticate, upload.single("profilePicture"), async (req, res) 
       },
     });
 
-    res.json({ user: updatedUser });
+    res.json({ 
+      user: {
+        ...updatedUser,
+        profilePicture: getFullUrl(updatedUser.profilePicture)
+      }
+    });
   } catch (err) {
     console.error("Error updating profile:", err);
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+
+
+// GET /profile/:id
+router.get("/:id", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(id) },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        bio: true,
+        profilePicture: true,
+        isVerified: true,
+      },
+    });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.json(user);
+  } catch (err) {
+    console.error("Error fetching profile:", err);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

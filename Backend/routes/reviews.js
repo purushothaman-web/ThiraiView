@@ -54,6 +54,20 @@ review.post('/movies/:id/reviews', authMiddleware, async (req, res) => {
       },
     });
 
+    // Create notification for movie author (if not reviewing own movie)
+    if (movie.userId && movie.userId !== userId) {
+      await prisma.notification.create({
+        data: {
+          type: 'MOVIE_ADDED',
+          message: `${req.user.username || req.user.name} reviewed your movie "${movie.title}"`,
+          userId: movie.userId,
+          actorId: userId,
+          movieId: movieId,
+          reviewId: review.id
+        }
+      });
+    }
+
     return res.status(201).json(review);
   } catch (error) {
     console.error('Error creating review:', error);
@@ -214,6 +228,19 @@ review.post('/:id/like', authMiddleware, async (req, res) => {
     const like = await prisma.reviewLike.create({
       data: { reviewId, userId },
     });
+
+    // Create notification for review author (if not liking own review)
+    if (reviewExists.userId !== userId) {
+      await prisma.notification.create({
+        data: {
+          type: 'REVIEW_LIKE',
+          message: `${req.user.username || req.user.name} liked your review`,
+          userId: reviewExists.userId,
+          actorId: userId,
+          reviewId: reviewId
+        }
+      });
+    }
 
     res.json({ message: 'Review liked', like });
   } catch (error) {
