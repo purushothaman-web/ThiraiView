@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-import { isNonEmptyString, isYear } from "../components/ui/Validation";
+import { isNonEmptyString, isYear } from "../components/ui/validation";
 
 const AddMovie = () => {
   const { user, apiClient } = useContext(AuthContext);
