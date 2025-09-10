@@ -60,8 +60,8 @@ app.use(
 );
 
 // CORS - Must be before rate limiting
-const defaultAllowed = [FRONTEND_URL, "http://localhost:5173", "http://127.0.0.1:5173"];
-const allowedOrigins = (process.env.FRONTEND_URLS || "")
+const defaultAllowed = [FRONTEND_URL];
+const allowedOrigins = (process.env.FRONTEND_URLS)
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean)
