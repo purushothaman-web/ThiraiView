@@ -26,9 +26,9 @@ const commentRoutes = require('./routes/comments');
 const notificationRoutes = require('./routes/notifications');
 const adminRoutes = require('./routes/admin');
 
-const PORT = process.env.PORT || 3000;
-const NODE_ENV = process.env.NODE_ENV || "development";
-const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const PORT = process.env.PORT;
+const NODE_ENV = process.env.NODE_ENV;
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 // Basic env validation
 const requiredEnv = [
