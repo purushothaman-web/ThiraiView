@@ -49,7 +49,7 @@ if (missing.length) {
   console.warn("Missing env vars:", missing.join(", "));
 }
 
-app.set('trust proxy', true); 
+app.set('trust proxy', 1); 
 
 // Security and performance
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
