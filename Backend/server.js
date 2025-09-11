@@ -62,12 +62,18 @@ app.use(
 );
 
 // CORS - Must be before rate limiting
-const defaultAllowed = [FRONTEND_URL];
-const allowedOrigins = (process.env.FRONTEND_URLS)
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean)
-  .concat(defaultAllowed);
+const frontendUrlsEnv = process.env.FRONTEND_URLS || '';
+const allowedOrigins = frontendUrlsEnv
+  .split(',')
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+if (FRONTEND_URL && !allowedOrigins.includes(FRONTEND_URL)) {
+  allowedOrigins.push(FRONTEND_URL);
+}
+
+console.log("✅ Allowed Origins:", allowedOrigins); // Optional debug
+
 
 app.use(
   cors({
