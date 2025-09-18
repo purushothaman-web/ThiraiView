@@ -1,8 +1,11 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
 const Signup = () => {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -74,14 +77,20 @@ const Signup = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     // Clear server error when user starts typing
     if (serverError) setServerError("");
-    
+
     // Validate field if it's been touched
     if (touched[name]) {
       const error = validateField(name, value);
       setErrors(prev => ({ ...prev, [name]: error }));
+    }
+
+    // Also re-validate confirmPassword if password changes
+    if (name === 'password' && touched.confirmPassword) {
+      const confirmPasswordError = validateField('confirmPassword', formData.confirmPassword);
+      setErrors(prev => ({ ...prev, confirmPassword: confirmPasswordError }));
     }
   };
 
@@ -152,9 +161,11 @@ const Signup = () => {
     }
   };
 
-  // Check if form is valid
-  const isFormValid = Object.keys(errors).length === 0 && 
-    Object.values(formData).every(value => value.trim() !== "");
+   // Check if form is valid
+   const isFormValid = useMemo(() => {
+    return Object.values(errors).every(error => error === "") &&
+      Object.values(formData).every(value => value.trim() !== "");
+  }, [errors, formData]);
 
 
   return (
@@ -176,7 +187,7 @@ const Signup = () => {
               onChange={handleChange}
               onBlur={handleBlur}
               className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
-                touched.name && errors.name ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
+                touched.name && errors.name ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}
               }`}
               placeholder="Enter your full name"
             />
@@ -197,7 +208,7 @@ const Signup = () => {
               onChange={handleChange}
               onBlur={handleBlur}
               className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
-                touched.username && errors.username ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
+                touched.username && errors.username ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}
               }`}
               placeholder="Choose a username"
             />
@@ -218,7 +229,7 @@ const Signup = () => {
               onChange={handleChange}
               onBlur={handleBlur}
               className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
-                touched.email && errors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
+                touched.email && errors.email ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}
               }`}
               placeholder="Enter your email"
             />
@@ -232,17 +243,26 @@ const Signup = () => {
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
               Password
             </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
-                touched.password && errors.password ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
-              }`}
-              placeholder="Create a strong password"
-            />
+            <div className="relative">
+              <input
+                type={passwordVisible ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
+                  touched.password && errors.password ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}
+                }`}
+                placeholder="Create a strong password"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                onClick={() => setPasswordVisible(!passwordVisible)}
+              >
+                {passwordVisible ? "Hide" : "Show"}
+              </button>
+            </div>
             {touched.password && errors.password && (
               <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.password}</p>
             )}
@@ -256,17 +276,26 @@ const Signup = () => {
             <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
               Confirm Password
             </label>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
-                touched.confirmPassword && errors.confirmPassword ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'
-              }`}
-              placeholder="Confirm your password"
-            />
+            <div className="relative">
+              <input
+                type={confirmPasswordVisible ? "text" : "password"}
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                className={`w-full border rounded-lg p-3 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm ${
+                  touched.confirmPassword && errors.confirmPassword ? 'border-red-500 dark:border-red-400' : 'border-gray-300 dark:border-gray-600'}
+                }`}
+                placeholder="Confirm your password"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+              >
+                {confirmPasswordVisible ? "Hide" : "Show"}
+              </button>
+            </div>
             {touched.confirmPassword && errors.confirmPassword && (
               <p className="text-red-600 dark:text-red-400 text-xs mt-1">{errors.confirmPassword}</p>
             )}
@@ -282,6 +311,7 @@ const Signup = () => {
             </div>
           )}
 
+          {console.log("submitting:", submitting, "isFormValid:", isFormValid)}
           {/* Submit Button */}
           <button
             type="submit"

@@ -11,6 +11,8 @@ const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
 
   const { token } = useParams();
   const navigate = useNavigate();
@@ -138,35 +140,53 @@ const ResetPassword = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              New Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Enter new password"
-              required
-              minLength={6}
-            />
-          </div>
+        <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    New Password
+  </label>
+  <div className="relative">
+    <input
+      type={passwordVisible ? "text" : "password"}
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      className="w-full border border-gray-300 rounded-lg p-3 pr-16 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+      placeholder="Enter new password"
+      required
+      minLength={6}
+    />
+    <button
+      type="button"
+      className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+      onClick={() => setPasswordVisible(!passwordVisible)}
+    >
+      {passwordVisible ? "Hide" : "Show"}
+    </button>
+  </div>
+</div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Confirm new password"
-              required
-              minLength={6}
-            />
-          </div>
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Confirm Password
+  </label>
+  <div className="relative">
+    <input
+      type={confirmPasswordVisible ? "text" : "password"}
+      value={confirmPassword}
+      onChange={(e) => setConfirmPassword(e.target.value)}
+      className="w-full border border-gray-300 rounded-lg p-3 pr-16 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+      placeholder="Confirm new password"
+      required
+      minLength={6}
+    />
+    <button
+      type="button"
+      className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700 focus:outline-none"
+      onClick={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
+    >
+      {confirmPasswordVisible ? "Hide" : "Show"}
+    </button>
+  </div>
+</div>
 
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3">
