@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { PrismaClient } = require('../generated/prisma');
 
@@ -17,7 +17,6 @@ const {
   NODE_ENV
 } = process.env;
 
-// 🛑 Fail fast if missing critical env vars
 if (!MAIL_HOST || !MAIL_PORT || !MAIL_USER || !MAIL_PASS || !EMAIL_FROM || !FRONTEND_URL) {
   throw new Error("One or more required email or app config environment variables are missing.");
 }

@@ -1,6 +1,6 @@
 const { PrismaClient } = require('../generated/prisma');
 const express = require('express');
-const authMiddleware = require('../middleware/auth'); 
+const authMiddleware = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { deleteImage, getFullUrl, USE_CLOUDINARY } = require('../config/cloudinary');
 
@@ -86,7 +86,10 @@ lofm.get('/autocomplete', async (req, res) => {
       select: {
         id: true,
         title: true,
-        poster: true
+        id: true,
+        title: true,
+        poster: true,
+        genre: true
       },
       take: 10
     });
@@ -141,7 +144,9 @@ lofm.get('/:id', async (req, res) => {
         id: true,
         title: true,
         director: true,
+        director: true,
         year: true,
+        genre: true,
         userId: true,
         poster: true, // fetch raw poster path
       },
@@ -206,7 +211,7 @@ lofm.post('/:id/poster', authMiddleware, upload.single('poster'), async (req, re
 
     // Update movie with new poster URL
     const posterPath = USE_CLOUDINARY ? req.file.path : `/${process.env.MOVIE_UPLOADS_DIR || 'uploads/movies'}/${req.file.filename}`;
-    
+
     await prisma.movie.update({
       where: { id },
       data: { poster: posterPath },
@@ -215,7 +220,7 @@ lofm.post('/:id/poster', authMiddleware, upload.single('poster'), async (req, re
     // Return full updated movie payload for frontend to merge state
     const updated = await prisma.movie.findUnique({
       where: { id },
-      select: { id: true, title: true, director: true, year: true, userId: true, poster: true },
+      select: { id: true, title: true, director: true, year: true, genre: true, userId: true, poster: true },
     });
 
     res.json({ ...updated, poster: getFullUrl(updated.poster) });
@@ -231,7 +236,7 @@ lofm.post('/:id/poster', authMiddleware, upload.single('poster'), async (req, re
 lofm.post('/', authMiddleware, async (req, res) => {
   try {
     const { title, director, year } = req.body;
-    const userId = req.user.id; 
+    const userId = req.user.id;
 
     // Validate required fields
     if (!title || !director || !year) {
@@ -249,7 +254,13 @@ lofm.post('/', authMiddleware, async (req, res) => {
 
     // Insert movie
     const newMovie = await prisma.movie.create({
-      data: { title, director, year, userId },
+      data: {
+        title,
+        director,
+        year,
+        userId,
+        genre: req.body.genre || null
+      },
     });
 
 
@@ -288,7 +299,9 @@ lofm.put('/:id', authMiddleware, async (req, res) => {
     const updateData = {};
     if (title !== undefined) updateData.title = title;
     if (director !== undefined) updateData.director = director;
+    if (director !== undefined) updateData.director = director;
     if (year !== undefined) updateData.year = year;
+    if (req.body.genre !== undefined) updateData.genre = req.body.genre;
 
     const updatedMovie = await prisma.movie.update({
       where: { id },

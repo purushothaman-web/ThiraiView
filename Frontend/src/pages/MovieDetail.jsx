@@ -19,6 +19,7 @@ const MovieDetail = () => {
   const [editTitle, setEditTitle] = useState("");
   const [editDirector, setEditDirector] = useState("");
   const [editYear, setEditYear] = useState("");
+  const [editGenre, setEditGenre] = useState("");
   const [updateError, setUpdateError] = useState(null);
 
   // --- Review form state ---
@@ -74,6 +75,7 @@ const MovieDetail = () => {
     setEditTitle(movie.title);
     setEditDirector(movie.director);
     setEditYear(movie.year);
+    setEditGenre(movie.genre || "");
     setUpdateError(null);
     setIsEditing(true);
   };
@@ -84,56 +86,57 @@ const MovieDetail = () => {
   };
 
 
-const addToWatchlist = async () => {
-  try {
-    await apiClient.post('/watchlist', { movieId: movie.id });
-    setFormSuccess("Added to watchlist");
-    setIsInWatchlist(true);
-  } catch (err) {
-    setFormError(err.response?.data?.error || err.message || "Failed to add to watchlist");
-  }
-};
+  const addToWatchlist = async () => {
+    try {
+      await apiClient.post('/watchlist', { movieId: movie.id });
+      setFormSuccess("Added to watchlist");
+      setIsInWatchlist(true);
+    } catch (err) {
+      setFormError(err.response?.data?.error || err.message || "Failed to add to watchlist");
+    }
+  };
 
 
-const handleUpdate = async (e) => {
-  e.preventDefault();
-  if (!editTitle || !editDirector || !editYear) {
-    setUpdateError("All fields are required.");
-    return;
-  }
-
-  try {
-    // Step 1: Update movie details
-    const response = await apiClient.put(`/movies/${id}`, {
-      title: editTitle,
-      director: editDirector,
-      year: parseInt(editYear),
-    });
-
-    // Step 2: If movie update is successful, upload poster (if provided)
-    if (posterFile) {
-      const formData = new FormData();
-      formData.append("poster", posterFile);
-
-      try {
-        const posterRes = await apiClient.post(`/movies/${id}/poster`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        setMovie(posterRes.data); // movie with updated poster
-      } catch (posterErr) {
-        setPosterUploadError(posterErr.response?.data?.error || "Poster upload failed.");
-        setMovie(response.data); // still update with movie data
-      }
-    } else {
-      setMovie(response.data); // update without new poster
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!editTitle || !editDirector || !editYear) {
+      setUpdateError("All fields are required.");
+      return;
     }
 
-    setIsEditing(false);
-    setUpdateError("");
-  } catch (err) {
-    setUpdateError(err.response?.data?.error || "Something went wrong. Please try again.");
-  }
-};
+    try {
+      // Step 1: Update movie details
+      const response = await apiClient.put(`/movies/${id}`, {
+        title: editTitle,
+        director: editDirector,
+        year: parseInt(editYear),
+        genre: editGenre.trim() || null,
+      });
+
+      // Step 2: If movie update is successful, upload poster (if provided)
+      if (posterFile) {
+        const formData = new FormData();
+        formData.append("poster", posterFile);
+
+        try {
+          const posterRes = await apiClient.post(`/movies/${id}/poster`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          setMovie(posterRes.data); // movie with updated poster
+        } catch (posterErr) {
+          setPosterUploadError(posterErr.response?.data?.error || "Poster upload failed.");
+          setMovie(response.data); // still update with movie data
+        }
+      } else {
+        setMovie(response.data); // update without new poster
+      }
+
+      setIsEditing(false);
+      setUpdateError("");
+    } catch (err) {
+      setUpdateError(err.response?.data?.error || "Something went wrong. Please try again.");
+    }
+  };
 
 
   const handleDelete = async () => {
@@ -215,43 +218,43 @@ const handleUpdate = async (e) => {
     }
   };
 
-const handleToggleLike = async (review) => {
-  if (!user) {
-    setFormError("Please log in to like reviews.");
-    return;
-  }
-
-  const liked = review.likedByUser;
-
-  try {
-    if (!liked) {
-      // Like review
-      await apiClient.post(`/reviews/${review.id}/like`);
-    } else {
-      // Unlike review
-      await apiClient.delete(`/reviews/${review.id}/unlike`);
+  const handleToggleLike = async (review) => {
+    if (!user) {
+      setFormError("Please log in to like reviews.");
+      return;
     }
 
-    // Immutable update with logging
-    const updatedReviews = reviews.map((r) => {
-      if (r.id === review.id) {
-        const updatedReview = {
-          ...r,
-          likedByUser: !liked,
-          likesCount: liked ? (r.likesCount || 1) - 1 : (r.likesCount || 0) + 1,
-        };
-        console.log('Updating review:', updatedReview);
-        return updatedReview;
+    const liked = review.likedByUser;
+
+    try {
+      if (!liked) {
+        // Like review
+        await apiClient.post(`/reviews/${review.id}/like`);
+      } else {
+        // Unlike review
+        await apiClient.delete(`/reviews/${review.id}/unlike`);
       }
-      return r;
-    });
+
+      // Immutable update with logging
+      const updatedReviews = reviews.map((r) => {
+        if (r.id === review.id) {
+          const updatedReview = {
+            ...r,
+            likedByUser: !liked,
+            likesCount: liked ? (r.likesCount || 1) - 1 : (r.likesCount || 0) + 1,
+          };
+          console.log('Updating review:', updatedReview);
+          return updatedReview;
+        }
+        return r;
+      });
 
 
-    setReviews(updatedReviews);
-  } catch (err) {
-    setFormError(err.response?.data?.error || "Error updating like.");
-  }
-};
+      setReviews(updatedReviews);
+    } catch (err) {
+      setFormError(err.response?.data?.error || "Error updating like.");
+    }
+  };
 
 
 
@@ -285,6 +288,7 @@ const handleToggleLike = async (review) => {
           )}
           <p className="text-gray-700 text-lg">Directed by: {movie.director}</p>
           <p className="text-gray-600">Year: {movie.year}</p>
+          {movie.genre && <p className="text-gray-600">Genre: {movie.genre}</p>}
           <p className="text-yellow-600 font-semibold mb-6">
             ⭐ {movie.avgRating ? movie.avgRating.toFixed(1) : "No ratings yet"}
           </p>
@@ -338,6 +342,13 @@ const handleToggleLike = async (review) => {
             onChange={(e) => setEditYear(e.target.value)}
             className="w-full border p-2 rounded"
             placeholder="Year"
+          />
+          <input
+            type="text"
+            value={editGenre}
+            onChange={(e) => setEditGenre(e.target.value)}
+            className="w-full border p-2 rounded"
+            placeholder="Genre"
           />
 
           <div>
@@ -424,31 +435,31 @@ const handleToggleLike = async (review) => {
           ) : (
             <div className="space-y-4">
               {reviews.map((review) => (
-                
-  <div key={review.id} className="border p-4 rounded bg-white relative">
-    <p className="font-semibold">{review.user?.name || "Anonymous"}</p>
-    <p>⭐ {review.rating}</p>
-    <p>{review.content}</p>
-    <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</p>
 
-    {user && user.id === review.user.id && (
-      <div className="absolute top-2 right-2 flex gap-2">
-        <button
-          onClick={() => handleDeleteReview(review.id)}
-          className="px-2 py-1 bg-red-600 text-white rounded text-sm"
-        >
-          Delete
-        </button>
-        <button
-          onClick={() => startEditingReview(review)}
-          className="px-2 py-1 bg-gray-200 rounded text-sm"
-        >
-          Edit
-        </button>
-      </div>
-    )}
-  </div>
-))}
+                <div key={review.id} className="border p-4 rounded bg-white relative">
+                  <p className="font-semibold">{review.user?.name || "Anonymous"}</p>
+                  <p>⭐ {review.rating}</p>
+                  <p>{review.content}</p>
+                  <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</p>
+
+                  {user && user.id === review.user.id && (
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <button
+                        onClick={() => handleDeleteReview(review.id)}
+                        className="px-2 py-1 bg-red-600 text-white rounded text-sm"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => startEditingReview(review)}
+                        className="px-2 py-1 bg-gray-200 rounded text-sm"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </>

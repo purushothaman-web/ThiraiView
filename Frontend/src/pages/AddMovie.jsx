@@ -10,6 +10,7 @@ const AddMovie = () => {
   const [title, setTitle] = useState("");
   const [director, setDirector] = useState("");
   const [year, setYear] = useState("");
+  const [genre, setGenre] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [poster, setPoster] = useState(null);
@@ -21,66 +22,68 @@ const AddMovie = () => {
     }
   }, [user, navigate]);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  setError("");
-  setSuccess("");
+    setError("");
+    setSuccess("");
 
-  if (!isNonEmptyString(title) || !isNonEmptyString(director) || !isNonEmptyString(year)) {
-    setError("All fields are required.");
-    return;
-  }
-
-  const parsedYear = parseInt(year, 10);
-  if (!isYear(parsedYear, { min: 1800, max: new Date().getFullYear() + 1 })) {
-    setError("Please enter a valid year.");
-    return;
-  }
-
-  try {
-    // Step 1: Add movie
-    const movieResponse = await apiClient.post('/movies', {
-      title: title.trim(),
-      director: director.trim(),
-      year: parsedYear,
-    });
-
-    // Step 2: Upload poster (if present)
-    if (poster) {
-      if (!/(image\/png|image\/jpeg|image\/webp)/.test(poster.type)) {
-        setError("Poster must be PNG, JPEG, or WebP");
-        return;
-      }
-      if (poster.size > 5 * 1024 * 1024) {
-        setError("Poster must be under 5MB");
-        return;
-      }
-      const formData = new FormData();
-      formData.append("poster", poster);
-
-      try {
-        await apiClient.post(`/movies/${movieResponse.data.id}/poster`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } catch (posterErr) {
-        setError(posterErr.response?.data?.error || "Movie added but failed to upload poster.");
-        return;
-      }
+    if (!isNonEmptyString(title) || !isNonEmptyString(director) || !isNonEmptyString(year)) {
+      setError("All fields are required.");
+      return;
     }
 
-    setSuccess("Movie added successfully!");
-    setTitle("");
-    setDirector("");
-    setYear("");
-    setPoster(null);
+    const parsedYear = parseInt(year, 10);
+    if (!isYear(parsedYear, { min: 1800, max: new Date().getFullYear() + 1 })) {
+      setError("Please enter a valid year.");
+      return;
+    }
 
-    setTimeout(() => navigate("/"), 1500);
-  } catch (err) {
-    console.error("Error:", err);
-    setError(err.response?.data?.error || "Something went wrong. Try again.");
-  }
-};
+    try {
+      // Step 1: Add movie
+      const movieResponse = await apiClient.post('/movies', {
+        title: title.trim(),
+        director: director.trim(),
+        year: parsedYear,
+        genre: genre.trim() || null,
+      });
+
+      // Step 2: Upload poster (if present)
+      if (poster) {
+        if (!/(image\/png|image\/jpeg|image\/webp)/.test(poster.type)) {
+          setError("Poster must be PNG, JPEG, or WebP");
+          return;
+        }
+        if (poster.size > 5 * 1024 * 1024) {
+          setError("Poster must be under 5MB");
+          return;
+        }
+        const formData = new FormData();
+        formData.append("poster", poster);
+
+        try {
+          await apiClient.post(`/movies/${movieResponse.data.id}/poster`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        } catch (posterErr) {
+          setError(posterErr.response?.data?.error || "Movie added but failed to upload poster.");
+          return;
+        }
+      }
+
+      setSuccess("Movie added successfully!");
+      setTitle("");
+      setDirector("");
+      setYear("");
+      setGenre("");
+      setPoster(null);
+
+      setTimeout(() => navigate("/"), 1500);
+    } catch (err) {
+      console.error("Error:", err);
+      setError(err.response?.data?.error || "Something went wrong. Try again.");
+    }
+  };
 
 
   return (
@@ -123,6 +126,17 @@ const handleSubmit = async (e) => {
             required
             min="1800"
             max={new Date().getFullYear() + 1}
+          />
+        </div>
+
+        <div className="mb-6">
+          <label className="block font-medium mb-1 text-gray-900 dark:text-gray-100">Genre</label>
+          <input
+            type="text"
+            value={genre}
+            onChange={(e) => setGenre(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded p-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 dark:focus:border-blue-400 transition-all duration-200 shadow-sm"
+            placeholder="e.g. Action, Drama, Sci-Fi"
           />
         </div>
 

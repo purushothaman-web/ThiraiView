@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { PrismaClient } = require('../generated/prisma'); // adjust path if needed
@@ -46,17 +46,17 @@ router.post('/', async (req, res) => {
 
     // Check if user is verified (superuser/admin bypass verification requirement)
     if (!user.isVerified && user.role !== 'ADMIN') {
-      return res.status(403).json({ 
-        error: 'Account not verified', 
+      return res.status(403).json({
+        error: 'Account not verified',
         code: 'UNVERIFIED_ACCOUNT',
         message: 'Please verify your email before logging in. Check your inbox for a verification link.'
       });
     }
 
     // Generate Access Token with additional claims for admin users
-    const tokenPayload = { 
-      id: user.id, 
-      email: user.email, 
+    const tokenPayload = {
+      id: user.id,
+      email: user.email,
       role: user.role,
       username: user.username
     };
@@ -99,7 +99,9 @@ router.post('/', async (req, res) => {
         email: user.email,
         role: user.role,
         isSuperuser: user.role === 'ADMIN',
-        isVerified: user.isVerified
+        isVerified: user.isVerified,
+        profilePicture: user.profilePicture,
+        bio: user.bio
       },
     });
 

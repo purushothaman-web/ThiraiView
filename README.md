@@ -114,7 +114,7 @@ VITE_FRONTEND_URL=http://localhost:5173
 
 1. **Clone the repo**
    ```sh
-   git clone https://github.com/FrontEndExplorer-Temp/ThiraiView.git
+   git clone https://github.com/purushothaman-web/ThiraiView.git
    cd ThiraiView
    ```
 

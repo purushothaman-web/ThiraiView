@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { PrismaClient } = require('../generated/prisma');
+const requireAuth = require('../middleware/auth'); // Import auth middleware
 
 const prisma = new PrismaClient();
 const router = express.Router();
@@ -15,6 +16,38 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 if (!JWT_SECRET || !REFRESH_TOKEN_SECRET) {
   throw new Error('JWT secrets must be defined in your environment variables.');
 }
+
+
+// GET /auth/validate - Validate access token and return user
+router.get('/validate', requireAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        name: true,
+        role: true,
+        isVerified: true,
+        profilePicture: true,
+        bio: true
+      }
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    res.json({
+      user: {
+        ...user,
+        isSuperuser: user.role === 'ADMIN'
+      }
+    });
+  } catch (err) {
+    console.error('Validation error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // POST /auth/refresh
 router.post('/refresh', async (req, res) => {

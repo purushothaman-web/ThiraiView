@@ -5,10 +5,12 @@ const router = express.Router();
 const { PrismaClient } = require('../generated/prisma');
 const prisma = new PrismaClient();
 const authenticate = require("../middleware/auth"); // JWT middleware
+// Optional auth middleware for public routes
+const optionalAuth = require("../middleware/auth").optional;
 const upload = require("../middleware/uploadProfile"); // multer config
 const { deleteImage, getFullUrl, USE_CLOUDINARY } = require('../config/cloudinary');
 
-// GET /profile
+// GET /profile - Own Profile
 router.get("/", authenticate, async (req, res) => {
   try {
     const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL;
@@ -26,6 +28,8 @@ router.get("/", authenticate, async (req, res) => {
         profilePicture: null,
         isVerified: true,
         watchlistCount: 0,
+        followersCount: 0,
+        followingCount: 0,
         role: 'ADMIN',
         isDefaultAdmin: true
       });
@@ -41,23 +45,34 @@ router.get("/", authenticate, async (req, res) => {
         bio: true,
         profilePicture: true,
         isVerified: true,
+        _count: {
+          select: {
+            followers: true,
+            following: true,
+            watchlists: true
+          }
+        }
       },
     });
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const watchlistCount = await prisma.watchlist.count({
-      where: { userId: req.user.id },
-    });
+    // Flatten _count
+    const { _count, ...userData } = user;
 
-    res.json({ ...user, watchlistCount });
+    res.json({
+      ...userData,
+      watchlistCount: _count.watchlists,
+      followersCount: _count.followers,
+      followingCount: _count.following
+    });
   } catch (err) {
     console.error("Error fetching profile:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-// GET /profile/movies
+// GET /profile/movies - Own Movies
 router.get("/movies", authenticate, async (req, res) => {
   try {
     const movies = await prisma.movie.findMany({
@@ -79,7 +94,7 @@ router.get("/movies", authenticate, async (req, res) => {
   }
 });
 
-// GET /profile/watchlist
+// GET /profile/watchlist - Own Watchlist
 router.get("/watchlist", authenticate, async (req, res) => {
   try {
     const watchlist = await prisma.watchlist.findMany({
@@ -99,7 +114,7 @@ router.get("/watchlist", authenticate, async (req, res) => {
   }
 });
 
-// GET /profile/reviews
+// GET /profile/reviews - Own Reviews
 router.get("/reviews", authenticate, async (req, res) => {
   try {
     const reviews = await prisma.review.findMany({
@@ -116,7 +131,7 @@ router.get("/reviews", authenticate, async (req, res) => {
   }
 });
 
-// PUT /profile
+// PUT /profile - Update Own Profile
 router.put("/", authenticate, upload.single("profilePicture"), async (req, res) => {
   try {
     const { username, bio } = req.body;
@@ -140,20 +155,29 @@ router.put("/", authenticate, upload.single("profilePicture"), async (req, res) 
 
     let profilePicturePath = user.profilePicture;
 
-    // If new profile picture uploaded
+    // Handle File Upload
     if (req.file) {
-      // Delete old profile picture if exists
+      // Delete old profile picture if it was a local file or cloudinary id
       if (profilePicturePath) {
         try {
           await deleteImage(profilePicturePath);
         } catch (deleteError) {
           console.error('Error deleting old profile picture:', deleteError);
-          // Continue with upload even if deletion fails
         }
       }
-
-      // Set new profile picture path
       profilePicturePath = USE_CLOUDINARY ? req.file.path : `/${process.env.PROFILE_UPLOADS_DIR || 'uploads/profiles'}/${req.file.filename}`;
+    }
+    // Handle URL Update (Avatar Selection)
+    else if (req.body.profilePicture && typeof req.body.profilePicture === 'string') {
+      // If user is switching from an uploaded file to an avatar URL, we should try to delete the old file
+      if (profilePicturePath && !profilePicturePath.startsWith('http') && !profilePicturePath.startsWith('https://api.dicebear.com')) {
+        try {
+          await deleteImage(profilePicturePath);
+        } catch (e) {
+          console.error("Error cleaning up old profile picture:", e);
+        }
+      }
+      profilePicturePath = req.body.profilePicture;
     }
 
     const updatedUser = await prisma.user.update({
@@ -173,7 +197,7 @@ router.put("/", authenticate, upload.single("profilePicture"), async (req, res) 
       },
     });
 
-    res.json({ 
+    res.json({
       user: {
         ...updatedUser,
         profilePicture: getFullUrl(updatedUser.profilePicture)
@@ -186,30 +210,127 @@ router.put("/", authenticate, upload.single("profilePicture"), async (req, res) 
 });
 
 
+// --- Public Profile Routes ---
 
-// GET /profile/:id
-router.get("/:id", authenticate, async (req, res) => {
+// GET /profile/:id - Public Profile Info
+router.get("/:id", optionalAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    const viewerId = req.user?.id;
 
     const user = await prisma.user.findUnique({
       where: { id: parseInt(id) },
       select: {
         id: true,
-        email: true,
         username: true,
         name: true,
         bio: true,
         profilePicture: true,
         isVerified: true,
+        createdAt: true,
+        _count: {
+          select: {
+            followers: true,
+            following: true,
+            watchlists: true,
+            reviews: true,
+            movies: true
+          }
+        }
       },
     });
 
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json(user);
+    let isFollowing = false;
+    if (viewerId) {
+      const follow = await prisma.userFollow.findUnique({
+        where: {
+          followerId_followingId: {
+            followerId: viewerId,
+            followingId: user.id
+          }
+        }
+      });
+      isFollowing = !!follow;
+    }
+
+    // Flatten _count
+    const { _count, ...userData } = user;
+
+    res.json({
+      ...userData,
+      followersCount: _count.followers,
+      followingCount: _count.following,
+      reviewsCount: _count.reviews,
+      moviesCount: _count.movies,
+      watchlistCount: _count.watchlists,
+      isFollowing
+    });
+
   } catch (err) {
     console.error("Error fetching profile:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /profile/:id/reviews - Public Reviews
+router.get("/:id/reviews", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reviews = await prisma.review.findMany({
+      where: { userId: parseInt(id) },
+      include: {
+        movie: { select: { id: true, title: true, poster: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(reviews);
+  } catch (err) {
+    console.error("Error fetching user reviews:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /profile/:id/movies - Public Movies (Added by user)
+router.get("/:id/movies", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const movies = await prisma.movie.findMany({
+      where: { userId: parseInt(id) },
+      select: {
+        id: true,
+        title: true,
+        director: true,
+        year: true,
+        poster: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json(movies);
+  } catch (err) {
+    console.error("Error fetching user movies:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /profile/:id/watchlist - Public Watchlist
+router.get("/:id/watchlist", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const watchlist = await prisma.watchlist.findMany({
+      where: { userId: parseInt(id) },
+      include: {
+        movie: {
+          select: { id: true, title: true, year: true, director: true, poster: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(watchlist);
+  } catch (err) {
+    console.error("Error fetching watchlist:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });

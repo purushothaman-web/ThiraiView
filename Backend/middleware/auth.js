@@ -18,7 +18,7 @@ function requireAuth(req, res, next) {
     next();
   } catch (error) {
     console.error('JWT verification failed:', error);
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
@@ -27,11 +27,11 @@ function requireSuperuser(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  
+
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ error: 'Superuser access required' });
   }
-  
+
   next();
 }
 
@@ -40,11 +40,11 @@ function requireAdminOrModerator(req, res, next) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  
+
   if (!['ADMIN', 'MODERATOR'].includes(req.user.role)) {
     return res.status(403).json({ error: 'Admin or moderator access required' });
   }
-  
+
   next();
 }
 

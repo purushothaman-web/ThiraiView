@@ -35,10 +35,10 @@ export const AuthProvider = ({ children }) => {
       const response = await apiClient.get('/auth/validate', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return response.status === 200; // Token is valid if the backend returns 200
+      return response.data; // Now returns { user }
     } catch (error) {
       console.error("Token validation failed:", error);
-      return false; // Token is invalid
+      return null;
     }
   };
 
@@ -48,17 +48,13 @@ export const AuthProvider = ({ children }) => {
 
     if (storedToken && storedUser) {
       validateToken(storedToken)
-        .then(isValid => {
-          if (isValid) {
+        .then(data => {
+          if (data && data.user) {
             setToken(storedToken);
-            setUser(storedUser);
+            setUser(data.user); // Sync state with latest backend data (avatar, name, etc)
           } else {
-            console.log("Stored token is invalid. Logging out.");
-            // Clear local storage and state
-            setToken(null);
-            setUser(null);
-            localStorage.removeItem("token");
-            localStorage.removeItem("user");
+            console.log("Stored token is invalid or user not found. Logging out.");
+            logout();
           }
         });
     }
@@ -121,10 +117,10 @@ export const AuthProvider = ({ children }) => {
             setIsRefreshing(true);
             const response = await apiClient.post('/auth/refresh');
             const { accessToken } = response.data;
-            
+
             setToken(accessToken);
             localStorage.setItem("token", accessToken);
-            
+
             // Retry original request with new token
             originalRequest.headers.Authorization = `Bearer ${accessToken}`;
             return apiClient(originalRequest);

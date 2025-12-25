@@ -26,56 +26,59 @@ import SuperuserDashboard from "./components/SuperuserDashboard";
 import UserProfile from "./pages/UserProfile";
 import { ToastProvider } from "./components/ui/Toast";
 import { ConfirmDialogProvider } from "./components/ui/ConfirmDialog";
-import Footer from "./components/Footer";
+
 
 
 
 function App() {
   return (
+
     <ErrorBoundary>
-      <div className="min-h-screen bg-white text-gray-900">
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
         <ToastProvider>
           <ConfirmDialogProvider>
             {/* ✅ Navbar visible on all pages */}
             <Navbar />
 
-          {/* ✅ Define all routes */}
-          <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/movies/:id" element={<MovieDetail />} />
-        <Route path="/add-movie" element={<AddMovie />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+            {/* ✅ Main Content Area - Pushes Footer down & Clears Fixed Navbar */}
+            <main className="flex-grow pt-20">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/movies/:id" element={<MovieDetail />} />
+                <Route path="/add-movie" element={<AddMovie />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<Signup />} />
                 <Route
-          path="/profile"
-          element={
-            <PrivateRoute>
-              <Profile />
-            </PrivateRoute>
-          }
-        />
-        <Route path="/watchlist" element={<PrivateRoute><Watchlist /></PrivateRoute>} />
-  <Route path="/admin-dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
-  <Route path="/superuser-dashboard" element={<PrivateRoute><SuperuserDashboard /></PrivateRoute>} />
-        <Route path="/users/:id" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
-        <Route path="/feed" element={<PrivateRoute><UserFeed /></PrivateRoute>} />
-        <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
-        <Route path="/verify/:token" element={<VerifyEmail />} />
-        <Route path="/verify-pending" element={<VerifyPending />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        <Route path="/about" element={<About />} />
-        <Route path="*" element={<NotFound />} />
-          </Routes>
-          
-          {/* Footer visible on all pages */}
-          <Footer />
-            </ConfirmDialogProvider>
-          </ToastProvider>
-        </div>
+                  path="/profile"
+                  element={
+                    <PrivateRoute>
+                      <Profile />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="/watchlist" element={<PrivateRoute><Watchlist /></PrivateRoute>} />
+                <Route path="/admin-dashboard" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
+                <Route path="/superuser-dashboard" element={<PrivateRoute><SuperuserDashboard /></PrivateRoute>} />
+                <Route path="/users/:id" element={<PrivateRoute><UserProfile /></PrivateRoute>} />
+                <Route path="/feed" element={<PrivateRoute><UserFeed /></PrivateRoute>} />
+                <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
+                <Route path="/verify/:token" element={<VerifyEmail />} />
+                <Route path="/verify-pending" element={<VerifyPending />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
+                <Route path="/about" element={<About />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+
+            {/* Footer removed as per user request */}
+          </ConfirmDialogProvider>
+        </ToastProvider>
+      </div>
     </ErrorBoundary>
+
   );
 }
 

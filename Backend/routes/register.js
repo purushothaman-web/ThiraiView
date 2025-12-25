@@ -1,5 +1,5 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -103,7 +103,7 @@ router.post('/', async (req, res) => {
 
   // Check for required fields
   if (!name || !email || !password || !username) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'All fields are required (name, email, password, username).',
       field: !name ? 'name' : !email ? 'email' : !password ? 'password' : 'username'
     });
@@ -116,7 +116,7 @@ router.post('/', async (req, res) => {
 
   // Validate name
   if (!isValidName(trimmedName)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Name must be 2-50 characters long and contain only letters, spaces, hyphens, and apostrophes.',
       field: 'name'
     });
@@ -124,7 +124,7 @@ router.post('/', async (req, res) => {
 
   // Validate email
   if (!isValidEmail(trimmedEmail)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Please enter a valid email address.',
       field: 'email'
     });
@@ -132,7 +132,7 @@ router.post('/', async (req, res) => {
 
   // Validate password
   if (!isValidPassword(password)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.',
       field: 'password'
     });
@@ -140,7 +140,7 @@ router.post('/', async (req, res) => {
 
   // Validate username
   if (!isValidUsername(trimmedUsername)) {
-    return res.status(400).json({ 
+    return res.status(400).json({
       error: 'Username must be 3-20 characters long and contain only letters, numbers, and underscores.',
       field: 'username'
     });
@@ -150,7 +150,7 @@ router.post('/', async (req, res) => {
     // Check for duplicates
     const existingEmail = await prisma.user.findUnique({ where: { email: trimmedEmail } });
     if (existingEmail) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Email is already registered.',
         field: 'email'
       });
@@ -158,7 +158,7 @@ router.post('/', async (req, res) => {
 
     const existingUsername = await prisma.user.findUnique({ where: { username: trimmedUsername } });
     if (existingUsername) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Username is already taken.',
         field: 'username'
       });

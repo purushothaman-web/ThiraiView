@@ -49,7 +49,7 @@ const Home = () => {
       try {
         const qs = new URLSearchParams({ query, page: String(page), limit: String(limit) });
         const response = await apiClient.get(`/movies/search?${qs.toString()}`);
-        
+
         setMovies(response.data.movies);
         setTotalPages(response.data.totalPages);
         setTotalResults(response.data.total);
@@ -86,26 +86,7 @@ const Home = () => {
 
   return (
     <div className="px-4 md:px-6 max-w-7xl mx-auto">
-      <div className="mt-2 mb-6">
-        <Card>
-          <CardBody>
-            {/* Hero slider */}
-            <div className="relative overflow-hidden rounded-lg max-h-56 md:max-h-64">
-              {slides.length > 0 && (
-                <img src={slides[activeSlide]} alt="Slide" className="w-full object-cover" />
-              )}
-              <div className="absolute inset-x-0 bottom-3 text-center">
-                <span className="inline-block bg-white/90 dark:bg-gray-900/90 text-gray-900 dark:text-gray-100 px-3 py-1 rounded-lg text-sm backdrop-blur-sm">{quotes[activeSlide % quotes.length]}</span>
-              </div>
-              <div className="absolute right-3 bottom-3 flex gap-2">
-                {slides.map((_, i) => (
-                  <button key={i} onClick={() => setActiveSlide(i)} className={`h-2 w-2 rounded-full transition-colors duration-200 ${i === activeSlide ? "bg-blue-600 dark:bg-blue-400" : "bg-gray-400/50 dark:bg-gray-600/50"}`} aria-label={`Go to slide ${i+1}`} />
-                ))}
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      </div>
+
 
       {loading ? (
         <ListSkeleton count={6} ItemComponent={MovieCardSkeleton} />
@@ -121,29 +102,28 @@ const Home = () => {
 
       {totalResults > 0 && (
         <div className="flex items-center justify-center mt-8 gap-2">
-          <button 
-            onClick={() => handlePageChange(Math.max(1, currentPage - 1))} 
-            disabled={currentPage === 1} 
+          <button
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
             className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
           >
             Prev
           </button>
           {windowPages.map((p) => (
-            <button 
-              key={p} 
-              onClick={() => handlePageChange(p)} 
-              className={`px-3 py-1 rounded-lg border transition-colors duration-200 ${
-                p === currentPage 
-                  ? "bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500" 
+            <button
+              key={p}
+              onClick={() => handlePageChange(p)}
+              className={`px-3 py-1 rounded-lg border transition-colors duration-200 ${p === currentPage
+                  ? "bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500"
                   : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
-              }`}
+                }`}
             >
               {p}
             </button>
           ))}
-          <button 
-            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} 
-            disabled={currentPage === totalPages} 
+          <button
+            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
             className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
           >
             Next
