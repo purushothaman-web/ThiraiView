@@ -1,487 +1,239 @@
-import React, { useEffect, useState, useContext } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
-import Comments from "../components/Comments";
+import React, { useEffect, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import apiClient from "../api/axiosInstance";
+import { Star, Clock, Calendar, ArrowLeft, Loader, Play, Activity, Share2, Heart, Video } from "lucide-react";
+import TrailerModal from "../components/TrailerModal";
+import CastList from "../components/CastList";
+import RadarChart from "../components/RadarChart";
 
 const MovieDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { user, token, apiClient } = useContext(AuthContext);
-
+  const { sourceId } = useParams();
   const [movie, setMovie] = useState(null);
-  const [reviews, setReviews] = useState([]);
+  const [dna, setDna] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isInWatchlist, setIsInWatchlist] = useState(false);
-
-  // --- Movie editing state ---
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDirector, setEditDirector] = useState("");
-  const [editYear, setEditYear] = useState("");
-  const [editGenre, setEditGenre] = useState("");
-  const [updateError, setUpdateError] = useState(null);
-
-  // --- Review form state ---
-  const [reviewContent, setReviewContent] = useState("");
-  const [rating, setRating] = useState(5);
-  const [formError, setFormError] = useState("");
-  const [formSuccess, setFormSuccess] = useState("");
-  const [editingReviewId, setEditingReviewId] = useState(null);
-  const [posterFile, setPosterFile] = useState(null);
-  const [posterUploadError, setPosterUploadError] = useState("");
-
+  const [isTrailerOpen, setIsTrailerOpen] = useState(false);
+  const [trailerKey, setTrailerKey] = useState(null);
 
   useEffect(() => {
-    const fetchMovieAndReviews = async () => {
+    const fetchDetail = async () => {
       try {
-        setLoading(true);
+        const res = await apiClient.get(`/catalog/movies/${sourceId}`);
+        setMovie(res.data);
+        
+        // Extract trailer
+        if (res.data.videos && res.data.videos.results) {
+          const trailer = res.data.videos.results.find(v => v.type === "Trailer" && v.site === "YouTube");
+          if (trailer) setTrailerKey(trailer.key);
+        }
 
-        const [movieRes, reviewsRes] = await Promise.all([
-          apiClient.get(`/movies/${id}`),
-          apiClient.get(`/reviews/movies/${id}/reviews`)
-        ]);
-
-        setMovie(movieRes.data);
-        setReviews(reviewsRes.data);
-      } catch (err) {
-        setError(err.response?.data?.error || err.message || "Failed to fetch data");
+        // Fetch DNA in parallel or after
+        const dnaRes = await apiClient.get(`/catalog/dna/${sourceId}`);
+        setDna(dnaRes.data);
+      } catch {
+        setError("Failed to load movie details.");
       } finally {
         setLoading(false);
       }
     };
+    fetchDetail();
+    // Scroll to top on mount/change
+    window.scrollTo(0, 0);
+  }, [sourceId]);
 
-    fetchMovieAndReviews();
-  }, [id, apiClient]);
+  if (loading) return <div className="flex justify-center items-center h-screen bg-brand-black"><Loader className="animate-spin text-brand-yellow" size={40} /></div>;
+  if (error) return <div className="text-center py-20 text-red-500 bg-brand-black min-h-screen">{error}</div>;
+  if (!movie) return <div className="text-center py-20 bg-brand-black min-h-screen text-white">Movie not found</div>;
 
-  // Check if movie already in user's watchlist
-  useEffect(() => {
-    const checkWatchlist = async () => {
-      if (!token) return setIsInWatchlist(false);
-      try {
-        const response = await apiClient.get('/watchlist');
-        const items = response.data;
-        const exists = Array.isArray(items) && items.some((w) => (w.movieId === Number(id)) || (w.movie && w.movie.id === Number(id)));
-        setIsInWatchlist(Boolean(exists));
-      } catch (_) {
-        setIsInWatchlist(false);
-      }
-    };
-    checkWatchlist();
-  }, [token, id, apiClient]);
-
-  // --- Movie edit functions ---
-  const startEditing = () => {
-    setEditTitle(movie.title);
-    setEditDirector(movie.director);
-    setEditYear(movie.year);
-    setEditGenre(movie.genre || "");
-    setUpdateError(null);
-    setIsEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setUpdateError(null);
-  };
-
-
-  const addToWatchlist = async () => {
-    try {
-      await apiClient.post('/watchlist', { movieId: movie.id });
-      setFormSuccess("Added to watchlist");
-      setIsInWatchlist(true);
-    } catch (err) {
-      setFormError(err.response?.data?.error || err.message || "Failed to add to watchlist");
-    }
-  };
-
-
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    if (!editTitle || !editDirector || !editYear) {
-      setUpdateError("All fields are required.");
-      return;
-    }
-
-    try {
-      // Step 1: Update movie details
-      const response = await apiClient.put(`/movies/${id}`, {
-        title: editTitle,
-        director: editDirector,
-        year: parseInt(editYear),
-        genre: editGenre.trim() || null,
-      });
-
-      // Step 2: If movie update is successful, upload poster (if provided)
-      if (posterFile) {
-        const formData = new FormData();
-        formData.append("poster", posterFile);
-
-        try {
-          const posterRes = await apiClient.post(`/movies/${id}/poster`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-          setMovie(posterRes.data); // movie with updated poster
-        } catch (posterErr) {
-          setPosterUploadError(posterErr.response?.data?.error || "Poster upload failed.");
-          setMovie(response.data); // still update with movie data
-        }
-      } else {
-        setMovie(response.data); // update without new poster
-      }
-
-      setIsEditing(false);
-      setUpdateError("");
-    } catch (err) {
-      setUpdateError(err.response?.data?.error || "Something went wrong. Please try again.");
-    }
-  };
-
-
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this movie?")) return;
-
-    try {
-      await apiClient.delete(`/movies/${id}`);
-      setFormSuccess("Movie deleted successfully.");
-      navigate("/");
-    } catch (err) {
-      setFormError(err.response?.data?.error || "Something went wrong.");
-    }
-  };
-
-  // --- Review functions ---
-  const handleReviewSubmit = async (e) => {
-    e.preventDefault();
-    setFormError("");
-    setFormSuccess("");
-
-    if (!reviewContent.trim()) {
-      setFormError("Review content cannot be empty");
-      return;
-    }
-    if (typeof rating !== "number" || rating < 1 || rating > 5) {
-      setFormError("Rating must be between 1 and 5");
-      return;
-    }
-
-    try {
-      const response = await apiClient.post(`/reviews/movies/${id}/reviews`, {
-        content: reviewContent.trim(),
-        rating,
-      });
-
-      setReviews([response.data, ...reviews]);
-      setReviewContent("");
-      setRating(5);
-      setFormSuccess("Review added successfully!");
-    } catch (err) {
-      setFormError(err.response?.data?.error || "An error occurred.");
-    }
-  };
-
-  const handleUpdateReview = async () => {
-    if (!reviewContent.trim()) {
-      setFormError("Review content cannot be empty");
-      return;
-    }
-    if (typeof rating !== "number" || rating < 1 || rating > 5) {
-      setFormError("Rating must be between 1 and 5");
-      return;
-    }
-
-    try {
-      const response = await apiClient.put(`/reviews/${editingReviewId}`, {
-        content: reviewContent.trim(),
-        rating,
-      });
-
-      setReviews(reviews.map((r) => (r.id === editingReviewId ? { ...r, ...response.data } : r)));
-      setEditingReviewId(null);
-      setReviewContent("");
-      setRating(5);
-      setFormSuccess("Review updated!");
-    } catch (err) {
-      setFormError(err.response?.data?.error || "Update failed.");
-    }
-  };
-
-  const handleDeleteReview = async (reviewId) => {
-    if (!confirm("Are you sure you want to delete this review?")) return;
-
-    try {
-      await apiClient.delete(`/reviews/${reviewId}`);
-      setReviews(reviews.filter((r) => r.id !== reviewId));
-    } catch (err) {
-      setFormError(err.response?.data?.error || "Error deleting review");
-    }
-  };
-
-  const handleToggleLike = async (review) => {
-    if (!user) {
-      setFormError("Please log in to like reviews.");
-      return;
-    }
-
-    const liked = review.likedByUser;
-
-    try {
-      if (!liked) {
-        // Like review
-        await apiClient.post(`/reviews/${review.id}/like`);
-      } else {
-        // Unlike review
-        await apiClient.delete(`/reviews/${review.id}/unlike`);
-      }
-
-      // Immutable update with logging
-      const updatedReviews = reviews.map((r) => {
-        if (r.id === review.id) {
-          const updatedReview = {
-            ...r,
-            likedByUser: !liked,
-            likesCount: liked ? (r.likesCount || 1) - 1 : (r.likesCount || 0) + 1,
-          };
-          console.log('Updating review:', updatedReview);
-          return updatedReview;
-        }
-        return r;
-      });
-
-
-      setReviews(updatedReviews);
-    } catch (err) {
-      setFormError(err.response?.data?.error || "Error updating like.");
-    }
-  };
-
-
-
-  const startEditingReview = (review) => {
-    setEditingReviewId(review.id);
-    setReviewContent(review.content);
-    setRating(review.rating);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // --- Rendering ---
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div className="text-red-600">{error}</div>;
-  if (!movie) return <div>Movie not found.</div>;
-
-  const canModifyMovie = user && movie && user.id === movie.userId;
-  const userAlreadyReviewed = reviews.some((r) => r.user.id === user?.id);
+  const backdropUrl = movie.backdropPath 
+    ? `https://image.tmdb.org/t/p/original${movie.backdropPath}`
+    : null;
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Movie Section */}
-      {!isEditing ? (
-        <>
-          <h1 className="text-4xl font-bold mb-4">{movie.title}</h1>
-          {movie.poster && (
-            <img
-              src={movie.poster?.startsWith("http") ? movie.poster : `${BASE_URL}${movie.poster}`}
-              alt="Movie Poster"
-              className="w-full max-w-xs mb-4 rounded shadow"
-            />
-          )}
-          <p className="text-gray-700 text-lg">Directed by: {movie.director}</p>
-          <p className="text-gray-600">Year: {movie.year}</p>
-          {movie.genre && <p className="text-gray-600">Genre: {movie.genre}</p>}
-          <p className="text-yellow-600 font-semibold mb-6">
-            ⭐ {movie.avgRating ? movie.avgRating.toFixed(1) : "No ratings yet"}
-          </p>
+    <div className="bg-brand-black min-h-screen text-white pb-20 animate-fade-in">
+      
+      <TrailerModal isOpen={isTrailerOpen} onClose={() => setIsTrailerOpen(false)} videoKey={trailerKey} />
 
-          <button
-            onClick={addToWatchlist}
-            disabled={isInWatchlist}
-            className={`px-4 py-2 rounded mt-4 ${isInWatchlist ? "bg-gray-300 text-gray-600 cursor-not-allowed" : "bg-blue-500 text-white hover:bg-blue-600"}`}
-          >
-            {isInWatchlist ? "In Watchlist" : "Add to Watchlist"}
-          </button>
+      {/* Hero Header with Backdrop */}
+      <div className="relative w-full h-[70vh] md:h-[80vh] min-h-[650px] overflow-hidden">
+         {backdropUrl ? (
+           <>
+             <img src={backdropUrl} alt="" className="w-full h-full object-cover animate-scale-slow" />
+             <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/50 to-transparent"></div>
+             <div className="absolute inset-0 bg-gradient-to-r from-brand-black/90 via-brand-black/40 to-transparent"></div>
+           </>
+         ) : (
+            <div className="w-full h-full bg-brand-gray"></div>
+         )}
 
-
-          {canModifyMovie && (
-            <div className="mb-6 space-x-2">
-              <button
-                onClick={startEditing}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
-              >
-                Edit
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded"
-              >
-                Delete
-              </button>
+         {/* Content container overlapping hero */}
+         <div className="absolute bottom-0 left-0 w-full px-4 md:px-12 pb-12 z-20 flex flex-col md:flex-row gap-8 md:items-end">
+            
+            {/* Poster - Floating */}
+            <div className="hidden md:block w-72 shrink-0 rounded-xl overflow-hidden shadow-2xl border-4 border-brand-black/50 relative -mb-20 z-30 group animate-slide-up">
+               <img 
+                 src={movie.posterPath ? `https://image.tmdb.org/t/p/w500${movie.posterPath}` : "/placeholder-poster.png"} 
+                 alt={movie.title} 
+                 className="w-full h-auto"
+               />
+               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 backdrop-blur-sm">
+                  <button className="p-3 bg-brand-yellow text-brand-black rounded-full hover:scale-110 transition-transform"><Heart fill="currentColor" size={24}/></button>
+                  <button className="p-3 bg-white text-black rounded-full hover:scale-110 transition-transform"><Share2 size={24}/></button>
+               </div>
             </div>
-          )}
-        </>
-      ) : (
-        <form onSubmit={handleUpdate} className="space-y-4 mb-6">
-          {updateError && <p className="text-red-600">{updateError}</p>}
-          <input
-            type="text"
-            value={editTitle}
-            onChange={(e) => setEditTitle(e.target.value)}
-            className="w-full border p-2 rounded"
-            placeholder="Title"
-          />
-          <input
-            type="text"
-            value={editDirector}
-            onChange={(e) => setEditDirector(e.target.value)}
-            className="w-full border p-2 rounded"
-            placeholder="Director"
-          />
-          <input
-            type="number"
-            value={editYear}
-            onChange={(e) => setEditYear(e.target.value)}
-            className="w-full border p-2 rounded"
-            placeholder="Year"
-          />
-          <input
-            type="text"
-            value={editGenre}
-            onChange={(e) => setEditGenre(e.target.value)}
-            className="w-full border p-2 rounded"
-            placeholder="Genre"
-          />
 
-          <div>
-            <label className="block font-medium mb-1">Update Poster</label>
-            <input
-              type="file"
-              accept="image/png, image/jpeg, image/webp"
-              onChange={(e) => setPosterFile(e.target.files[0])}
-              className="w-full border p-2 rounded"
-            />
-          </div>
+            {/* Mobile Poster (small) */}
+            <div className="md:hidden w-32 rounded-lg overflow-hidden shadow-xl border-2 border-white/10 animate-slide-up">
+               <img 
+                 src={movie.posterPath ? `https://image.tmdb.org/t/p/w200${movie.posterPath}` : "/placeholder-poster.png"} 
+                 alt={movie.title} 
+                 className="w-full h-auto"
+               />
+            </div>
 
-          <div className="space-x-2">
-            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded">
-              Save
-            </button>
-            <button type="button" onClick={cancelEditing} className="px-4 py-2 bg-gray-400 text-white rounded">
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
+            {/* Info */}
+            <div className="flex-1 space-y-4 max-w-4xl animate-slide-up delay-100">
+               <h1 className="text-4xl md:text-6xl font-black leading-tight tracking-tight text-white drop-shadow-lg">
+                 {movie.title} 
+                 <span className="text-gray-400 text-2xl md:text-4xl font-bold ml-3">({movie.releaseDate?.split("-")[0]})</span>
+               </h1>
+               
+               {movie.tagline && <p className="text-xl text-brand-yellow italic font-medium drop-shadow-md">"{movie.tagline}"</p>}
 
-      {/* ✅ Reviews Section - hidden when editing */}
-      {!isEditing && (
-        <>
-          <h2 className="text-2xl font-semibold mb-4">Reviews</h2>
-          {user ? (
-            (!userAlreadyReviewed || editingReviewId) && (
-              <form
-                onSubmit={editingReviewId ? handleUpdateReview : handleReviewSubmit}
-                className="mb-6 bg-white border p-4 rounded shadow-sm"
-              >
-                <h3 className="text-lg font-semibold mb-2">
-                  {editingReviewId ? "Edit Review" : "Leave a Review"}
-                </h3>
-                <textarea
-                  value={reviewContent}
-                  onChange={(e) => setReviewContent(e.target.value)}
-                  rows="3"
-                  className="w-full border rounded p-2 mb-2"
-                  placeholder="Write your review..."
-                />
-                <div className="flex items-center gap-2 mb-2">
-                  <label>Rating:</label>
-                  <select
-                    value={rating}
-                    onChange={(e) => setRating(Number(e.target.value))}
-                    className="border rounded p-1"
+               <div className="flex flex-wrap items-center gap-4 md:gap-6 text-sm md:text-base font-medium text-gray-300">
+                  <span className="flex items-center gap-2 bg-black/40 px-3 py-1.5 rounded-lg border border-white/10 backdrop-blur-md">
+                     <Star className="text-brand-yellow fill-brand-yellow" size={18} /> 
+                     <span className="text-white font-bold text-lg">{movie.voteAverage?.toFixed(1)}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                     <Clock size={18} className="text-gray-400" /> {movie.runtime} min
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                     {movie.genres?.map(g => (
+                       <span key={g.id} className="px-3 py-1 bg-white/10 hover:bg-white/20 transition-colors border border-white/10 rounded-full text-xs font-bold uppercase tracking-wider">
+                         {g.name}
+                       </span>
+                     ))}
+                  </div>
+               </div>
+               
+               {/* Action Buttons */}
+               <div className="flex gap-4 pt-4">
+                  <button 
+                    onClick={() => setIsTrailerOpen(true)}
+                    disabled={!trailerKey}
+                    className={`px-8 py-3 rounded-xl font-black text-lg flex items-center gap-2 transition-colors shadow-[0_0_20px_rgba(255,215,0,0.3)] ${
+                      trailerKey 
+                      ? "bg-brand-yellow text-brand-black hover:bg-yellow-400" 
+                      : "bg-gray-800 text-gray-500 cursor-not-allowed"
+                    }`}
                   >
-                    {[1, 2, 3, 4, 5].map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {formError && <p className="text-red-500">{formError}</p>}
-                {formSuccess && <p className="text-green-500">{formSuccess}</p>}
-                <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
-                  {editingReviewId ? "Update Review" : "Submit Review"}
-                </button>
-                {editingReviewId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingReviewId(null);
-                      setReviewContent("");
-                      setRating(5);
-                    }}
-                    className="ml-2 text-gray-500 underline"
-                  >
-                    Cancel
+                     <Play fill="currentColor" size={20} /> {trailerKey ? "Play Trailer" : "No Trailer"}
                   </button>
-                )}
-              </form>
-            )
-          ) : (
-            <p className="text-gray-500 mb-6">🔐 You must be logged in to post a review.</p>
-          )}
-
-          {reviews.length === 0 ? (
-            <p>No reviews yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {reviews.map((review) => (
-
-                <div key={review.id} className="border p-4 rounded bg-white relative">
-                  <p className="font-semibold">{review.user?.name || "Anonymous"}</p>
-                  <p>⭐ {review.rating}</p>
-                  <p>{review.content}</p>
-                  <p className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</p>
-
-                  {user && user.id === review.user.id && (
-                    <div className="absolute top-2 right-2 flex gap-2">
-                      <button
-                        onClick={() => handleDeleteReview(review.id)}
-                        className="px-2 py-1 bg-red-600 text-white rounded text-sm"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => startEditingReview(review)}
-                        className="px-2 py-1 bg-gray-200 rounded text-sm"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+               </div>
             </div>
-          )}
-        </>
-      )}
+         </div>
+      </div>
 
-      {/* Comments Section */}
-      {reviews.length > 0 && (
-        <div className="mt-8">
-          {reviews.map((review) => (
-            <div key={review.id} className="mb-8">
-              <h3 className="text-lg font-semibold mb-4">
-                Comments on {review.user?.name || "Anonymous"}'s review
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 md:px-12 mt-24 md:mt-32 grid grid-cols-1 lg:grid-cols-3 gap-12 animate-fade-in delay-200">
+        
+        {/* Left Column: Overview & DNA */}
+        <div className="lg:col-span-2 space-y-12">
+           
+           <section>
+              <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2 border-l-4 border-brand-yellow pl-3">
+                Storyline
               </h3>
-              <Comments reviewId={review.id} />
-            </div>
-          ))}
-        </div>
-      )}
+              <p className="text-gray-300 text-lg leading-relaxed">
+                 {movie.overview}
+              </p>
+           </section>
 
+           {/* Cast List */}
+           <CastList cast={movie.cast} />
+
+
+
+           {/* DNA Analysis */}
+           {dna && (
+              <section className="bg-brand-gray rounded-3xl p-8 border border-gray-800 shadow-xl overflow-hidden relative group hover:border-brand-yellow/30 transition-colors duration-500">
+                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-[50px] group-hover:bg-brand-yellow/10 transition-colors duration-500"></div>
+                 <div className="relative z-10">
+                   <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                     <Activity className="text-brand-yellow" /> Cinematic DNA Analysis
+                   </h3>
+                   
+                   <div className="flex flex-col md:flex-row items-center justify-center gap-8">
+                      {/* Radar Chart */}
+                      <div className="shrink-0">
+                        <RadarChart data={dna.vector} size={300} />
+                      </div>
+
+                      {/* Text Breakdown */}
+                      <div className="flex-1 space-y-4 w-full">
+                        <p className="text-gray-400 text-sm italic mb-4">
+                          This movie's unique fingerprint based on its genres, pace, and mood.
+                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          {Object.entries(dna.vector).sort((a,b) => b[1] - a[1]).map(([trait, value]) => (
+                            <div key={trait} className="bg-black/40 p-3 rounded-lg border border-white/5 flex justify-between items-center group/item hover:border-brand-yellow/30 transition-colors">
+                               <span className="text-sm font-bold text-gray-300 capitalize">{trait}</span>
+                               <span className="text-brand-yellow font-mono font-bold">{(value * 100).toFixed(0)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                   </div>
+                 </div>
+              </section>
+           )}
+
+        </div>
+
+        {/* Right Column: Providers & Similar */}
+        <div className="space-y-12">
+            
+            {/* Providers */}
+            {movie.providers?.results?.IN?.flatrate && (
+               <section className="bg-brand-gray/50 p-6 rounded-2xl border border-gray-800">
+                  <h3 className="text-sm font-bold text-gray-500 mb-4 uppercase tracking-widest">Streaming On</h3>
+                  <div className="flex flex-wrap gap-4">
+                    {movie.providers.results.IN.flatrate.map(p => (
+                      <img key={p.provider_id} src={`https://image.tmdb.org/t/p/original${p.logo_path}`} alt={p.provider_name} className="w-12 h-12 rounded-xl shadow-lg hover:scale-105 transition-transform cursor-pointer" title={p.provider_name} />
+                    ))}
+                  </div>
+               </section>
+            )}
+
+            {/* Similar Vibe */}
+            {dna && (
+              <section>
+                 <h3 className="text-xl font-bold text-white mb-6 border-b border-gray-800 pb-2">More Like This</h3>
+                 <div className="space-y-4">
+                   {dna.similar?.slice(0, 5).map(sim => (
+                     <Link to={`/movies/${sim.sourceId}`} key={sim.sourceId} className="flex gap-4 items-center group p-2 rounded-xl hover:bg-brand-gray transition-colors border border-transparent hover:border-gray-800">
+                        <div className="w-16 h-24 shrink-0 overflow-hidden rounded-lg shadow-md bg-gray-800 relative">
+                           <img src={`https://image.tmdb.org/t/p/w92${sim.posterPath}`} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <h4 className="font-bold text-gray-200 group-hover:text-brand-yellow transition-colors truncate">{sim.title}</h4>
+                           <p className="text-xs text-gray-500 mt-1">{sim.releaseDate?.split("-")[0]}</p>
+                           <div className="flex items-center gap-1 mt-2 text-xs font-medium text-green-400">
+                              <Activity size={12} /> {((sim.similarity || 0.85) * 100).toFixed(0)}% Match
+                           </div>
+                        </div>
+                     </Link>
+                   ))}
+                   {(!dna.similar || dna.similar.length === 0) && <p className="text-gray-500 italic">No similar vibes found.</p>}
+                 </div>
+              </section>
+            )}
+        </div>
+
+      </div>
     </div>
   );
-
 };
 
 export default MovieDetail;

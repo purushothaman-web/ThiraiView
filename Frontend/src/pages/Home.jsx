@@ -1,135 +1,89 @@
-// src/pages/Home.jsx
-import React, { useEffect, useMemo, useState, useContext } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import MovieCard from "../components/MovieCard";
-import Card, { CardBody } from "../components/ui/Card";
-import { AuthContext } from "../context/AuthContext";
-import { MovieCardSkeleton, ListSkeleton } from "../components/ui/Skeleton";
+import React, { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import apiClient from "../api/axiosInstance";
+import HeroBanner from "../components/HeroBanner";
+import MovieRow from "../components/MovieRow";
+import { Loader } from "lucide-react";
 
 const Home = () => {
-  const [movies, setMovies] = useState([]);
+  const [featuredMovie, setFeaturedMovie] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const [totalPages, setTotalPages] = useState(0);
-  const [totalResults, setTotalResults] = useState(0);
-
   const location = useLocation();
-  const navigate = useNavigate();
-  const { apiClient, user } = useContext(AuthContext);
+  const query = new URLSearchParams(location.search).get("q");
 
-  // Slider images (auto-load from assets/slider)
-  const slides = useMemo(() => {
-    const modules = import.meta.glob("../assets/slider/*", { eager: true, as: "url" });
-    return Object.values(modules).slice(0, 3);
-  }, []);
-  const quotes = [
-    "Discover stories that stay with you.",
-    "Every frame tells a tale.",
-    "Find your next favorite movie.",
-  ];
-  const [activeSlide, setActiveSlide] = useState(0);
+  // Fetch Hero Banner Movie (Random Trending)
   useEffect(() => {
-    if (!slides.length) return;
-    const id = setInterval(() => setActiveSlide((s) => (s + 1) % slides.length), 4000);
-    return () => clearInterval(id);
-  }, [slides.length]);
-
-  // === Fetch movies whenever query params change ===
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const query = params.get("query") || "";
-    const page = parseInt(params.get("page")) || 1;
-    const limit = 9;
-
-    const fetchMovies = async () => {
-      setLoading(true);
-      setError(null);
-
+    const fetchHero = async () => {
       try {
-        const qs = new URLSearchParams({ query, page: String(page), limit: String(limit) });
-        const response = await apiClient.get(`/movies/search?${qs.toString()}`);
-
-        setMovies(response.data.movies);
-        setTotalPages(response.data.totalPages);
-        setTotalResults(response.data.total);
+        const res = await apiClient.get('/catalog/collection/trending');
+        const movies = res.data;
+        if (movies?.length > 0) {
+          const random = movies[Math.floor(Math.random() * Math.min(5, movies.length))];
+           // Get full details for the banner (logo, backdrop)
+           const detailRes = await apiClient.get(`/catalog/movies/${random.sourceId}`);
+           setFeaturedMovie(detailRes.data);
+        }
       } catch (err) {
-        setError(err.response?.data?.error || err.message || "Failed to fetch movies");
+        console.error("Hero fetch error", err);
       } finally {
         setLoading(false);
       }
     };
 
-    // Add a small delay to prevent rapid-fire requests
-    const timeoutId = setTimeout(fetchMovies, 100);
-    return () => clearTimeout(timeoutId);
-  }, [location.search, apiClient]);
+    if (!query) fetchHero();
+  }, [query]);
 
-  // === Handlers ===
-  const handlePageChange = (newPage) => {
-    const params = new URLSearchParams(location.search);
-    params.set("page", newPage);
-    navigate(`/?${params.toString()}`);
-  };
+  // Search Results View
+  const [searchResults, setSearchResults] = useState([]);
+  useEffect(() => {
+    if (!query) return;
+    const search = async () => {
+      const res = await apiClient.get(`/catalog/search?q=${encodeURIComponent(query)}`);
+      setSearchResults(res.data.results || []);
+    };
+    search();
+  }, [query]);
 
-  const currentPage = parseInt(new URLSearchParams(location.search).get("page")) || 1;
-  const windowPages = (() => {
-    if (totalPages <= 3) return Array.from({ length: totalPages }, (_, i) => i + 1);
-    if (currentPage <= 1) return [1, 2, 3];
-    if (currentPage >= totalPages) return [totalPages - 2, totalPages - 1, totalPages];
-    return [currentPage - 1, currentPage, currentPage + 1];
-  })();
 
-  // === UI ===
-  if (loading) return <div className="text-center mt-10 text-gray-900 dark:text-gray-100">Loading...</div>;
-  if (error) return <div className="text-center mt-10 text-red-600 dark:text-red-400">{error}</div>;
+  if (query) {
+    return (
+      <div className="bg-brand-black min-h-screen pt-24 pb-12 px-4">
+        <div className="container mx-auto">
+          <h1 className="text-3xl font-bold text-white mb-8">Search Results: <span className="text-brand-yellow">"{query}"</span></h1>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            {searchResults.map(m => (
+               <a href={`/movies/${m.sourceId}`} key={m.sourceId} className="group">
+                 <div className="rounded-lg overflow-hidden bg-brand-gray aspect-[2/3] mb-2 border border-gray-800 group-hover:border-brand-yellow/50 transition-colors">
+                   <img src={m.posterPath ? `https://image.tmdb.org/t/p/w500${m.posterPath}` : "/placeholder.png"} alt={m.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                 </div>
+                 <h3 className="text-white font-medium truncate group-hover:text-brand-yellow transition-colors">{m.title}</h3>
+                 <p className="text-sm text-gray-500">{m.releaseDate?.split('-')[0]}</p>
+               </a>
+            ))}
+            {searchResults.length === 0 && <p className="text-gray-400 text-lg">No results found.</p>}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="h-screen flex items-center justify-center"><Loader className="animate-spin text-brand-yellow" size={40} /></div>;
 
   return (
-    <div className="px-4 md:px-6 max-w-7xl mx-auto">
-
-
-      {loading ? (
-        <ListSkeleton count={6} ItemComponent={MovieCardSkeleton} />
-      ) : movies.length === 0 ? (
-        <Card><CardBody><p className="text-center text-gray-600 dark:text-gray-400">No movies found.</p></CardBody></Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {movies.map((movie) => (
-            <MovieCard key={movie.id} {...movie} medium />
-          ))}
-        </div>
-      )}
-
-      {totalResults > 0 && (
-        <div className="flex items-center justify-center mt-8 gap-2">
-          <button
-            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-          >
-            Prev
-          </button>
-          {windowPages.map((p) => (
-            <button
-              key={p}
-              onClick={() => handlePageChange(p)}
-              className={`px-3 py-1 rounded-lg border transition-colors duration-200 ${p === currentPage
-                  ? "bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500"
-                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
-                }`}
-            >
-              {p}
-            </button>
-          ))}
-          <button
-            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-          >
-            Next
-          </button>
-        </div>
-      )}
+    <div className="bg-brand-black min-h-screen pb-20">
+      <HeroBanner movie={featuredMovie} />
+      
+      <div className="relative z-20 pb-20 space-y-8 -mt-10 md:-mt-20 lg:-mt-32 pl-4 md:pl-12">
+        <MovieRow title="Trending Now" rowID="trending" fetchUrl="/catalog/collection/trending" />
+        <MovieRow title="Indian Blockbusters" rowID="indian" fetchUrl="/catalog/collection/indian" />
+        <MovieRow title="Anime Favorites" rowID="anime" fetchUrl="/catalog/collection/anime" />
+        <MovieRow title="Top Rated Classics" rowID="toprated" fetchUrl="/catalog/collection/top_rated" />
+        <MovieRow title="Action Blockbusters" rowID="action" fetchUrl="/catalog/collection/action" />
+        <MovieRow title="Comedy Hits" rowID="comedy" fetchUrl="/catalog/collection/comedy" />
+        <MovieRow title="Brain-Twisting Sci-Fi" rowID="scifi" fetchUrl="/catalog/collection/scifi" />
+        <MovieRow title="Chilling Horror" rowID="horror" fetchUrl="/catalog/collection/horror" />
+        <MovieRow title="Coming Soon" rowID="upcoming" fetchUrl="/catalog/collection/upcoming" />
+      </div>
     </div>
   );
 };

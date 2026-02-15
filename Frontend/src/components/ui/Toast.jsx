@@ -1,15 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-
-const ToastContext = createContext();
-
-export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
-};
+import { ToastContext } from '../../context/ToastContext';
 
 const Toast = ({ toast, onRemove }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -21,6 +12,13 @@ const Toast = ({ toast, onRemove }) => {
     return () => clearTimeout(timer);
   }, []);
 
+  const handleRemove = useCallback(() => {
+    setIsLeaving(true);
+    setTimeout(() => {
+      onRemove(toast.id);
+    }, 300);
+  }, [toast.id, onRemove]);
+
   React.useEffect(() => {
     if (toast.duration) {
       const timer = setTimeout(() => {
@@ -28,14 +26,7 @@ const Toast = ({ toast, onRemove }) => {
       }, toast.duration);
       return () => clearTimeout(timer);
     }
-  }, [toast.duration]);
-
-  const handleRemove = useCallback(() => {
-    setIsLeaving(true);
-    setTimeout(() => {
-      onRemove(toast.id);
-    }, 300);
-  }, [toast.id, onRemove]);
+  }, [toast.duration, handleRemove]);
 
   const getToastStyles = () => {
     const baseStyles = 'flex items-center p-4 rounded-lg shadow-lg border max-w-sm w-full transform transition-all duration-300 ease-in-out';
@@ -164,16 +155,4 @@ export const ToastProvider = ({ children }) => {
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </ToastContext.Provider>
   );
-};
-
-// Hook for easy toast usage
-export const useToastNotifications = () => {
-  const toast = useToast();
-  
-  return {
-    showSuccess: toast.success,
-    showError: toast.error,
-    showWarning: toast.warning,
-    showInfo: toast.info,
-  };
 };

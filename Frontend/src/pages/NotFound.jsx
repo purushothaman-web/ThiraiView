@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 export default function NotFound() {
   const location = useLocation();
   return (
-  <div className="min-h-[60vh] flex items-center justify-center px-4 bg-gray-50 dark:bg-gray-900">
+  <div className="min-h-[60vh] flex items-center justify-center px-4 bg-gray-50 dark:bg-gray-900 pt-20">
   <div className="text-center max-w-lg bg-white dark:bg-gray-900 p-8 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
         <h1 className="text-5xl font-extrabold mb-2 text-gray-900 dark:text-gray-100">404</h1>
         <p className="text-xl mb-4 text-gray-800 dark:text-gray-200">We couldn't find that page.</p>

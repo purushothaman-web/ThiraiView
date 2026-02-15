@@ -1,155 +1,87 @@
-require("dotenv").config(); // Load env vars before anything else
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const helmet = require("helmet");
 const compression = require("compression");
 const morgan = require("morgan");
+const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const app = express();
-const cookieParser = require('cookie-parser');
 const { PrismaClient } = require('./generated/prisma');
-const bcrypt = require('bcryptjs');
 
-const moviesRouter = require("./routes/movies");
-const loginRoute = require("./routes/login");
-const registerRoute = require("./routes/register");
-const reviewRouter = require("./routes/reviews");
-const profileRoute = require("./routes/profile");
-const watchlistRoutes = require("./routes/watchlist");
-const verifyRoute = require("./routes/verify");
-const resendVerification = require("./routes/resendVerification");
-const authRoutes = require('./routes/auth');
-const passwordResetRoutes = require('./routes/password-reset');
-const followRoutes = require('./routes/follow');
-const commentRoutes = require('./routes/comments');
-const notificationRoutes = require('./routes/notifications');
-const adminRoutes = require('./routes/admin');
+const catalogRoutes = require("./routes/catalog");
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000; // Fallback port
 const NODE_ENV = process.env.NODE_ENV;
-const FRONTEND_URL = process.env.FRONTEND_URL;
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 // Basic env validation
-const requiredEnv = [
-  "DATABASE_URL",
-  "JWT_SECRET",
-  "REFRESH_TOKEN_SECRET",
-  "FRONTEND_URL",
-  "APP_BASE_URL",
-  "ASSETS_BASE_URL",
-  "MAIL_HOST",
-  "MAIL_PORT",
-  "MAIL_USER",
-  "MAIL_PASS",
-  "EMAIL_FROM",
-];
+const requiredEnv = ["DATABASE_URL", "TMDB_API_KEY"];
 const missing = requiredEnv.filter((k) => !process.env[k]);
 if (missing.length) {
   console.warn("Missing env vars:", missing.join(", "));
 }
 
-app.set('trust proxy', 1); 
+app.set('trust proxy', 1);
 
 // Security and performance
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+app.use(helmet());
 app.use(compression());
-// Log only errors (4xx/5xx), suppress normal request logs
+// Log only errors (4xx/5xx) or all in dev
 app.use(
   morgan("combined", {
-    skip: (req, res) => res.statusCode < 400,
+    skip: (req, res) => res.statusCode < 400 && NODE_ENV === 'production',
   })
 );
 
-// CORS - Must be before rate limiting
-const frontendUrlsEnv = process.env.FRONTEND_URLS || '';
-const allowedOrigins = frontendUrlsEnv
-  .split(',')
-  .map((url) => url.trim())
-  .filter(Boolean);
-
-if (FRONTEND_URL && !allowedOrigins.includes(FRONTEND_URL)) {
-  allowedOrigins.push(FRONTEND_URL);
-}
-
-console.log("✅ Allowed Origins:", allowedOrigins); // Optional debug
-
-
+// CORS
+const allowedOrigins = [FRONTEND_URL, "http://localhost:5173"]; 
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
+      // Allow specific deployed frontend
+      if (FRONTEND_URL && origin === FRONTEND_URL) return cb(null, true);
+       // Allow standard localhost for dev
+      if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') return cb(null, true);
       return cb(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
+    methods: ["GET", "OPTIONS"], // Read-only API
   })
 );
 
-// Rate limit (general) - More lenient for development
-const limiter = rateLimit({ 
+// Rate limit
+const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: NODE_ENV === 'development' ? 10000 : 1000, // More lenient in dev
+  max: 500, // Reasonable limit for public catalog
   message: { error: 'Too many requests, please try again later.' }
 });
 app.use(limiter);
 
-// Stricter rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: NODE_ENV === 'development' ? 100 : 10, // 10 attempts per 15 min in prod
-  message: { error: 'Too many authentication attempts, please try again later.' }
-});
-
-// Middleware to parse JSON
 app.use(express.json());
-app.use(cookieParser());
 
 // Routes
-app.get("/", (req, res) => res.send("Hello Movies"));
-app.use("/movies", moviesRouter);
-app.use("/login", authLimiter, loginRoute);
-app.use("/register", authLimiter, registerRoute);
-app.use("/reviews", reviewRouter);
-// Conditionally serve static files (only in development)
-if (process.env.NODE_ENV !== 'production') {
-  app.use("/uploads", cors({ origin: allowedOrigins, credentials: true }), express.static("uploads"));
-}
+app.get("/", (req, res) => res.send("ThiraiView Catalog API"));
 
-// 🔹 Routes
-app.use("/profile", profileRoute);
-app.use("/watchlist", watchlistRoutes);
-app.use("/verify", verifyRoute);
-app.use("/resend-verification", authLimiter, resendVerification);
-app.use('/auth', authLimiter, authRoutes);
-app.use('/password-reset', authLimiter, passwordResetRoutes);
-app.use('/follow', followRoutes);
-app.use('/comments', commentRoutes);
-app.use('/notifications', notificationRoutes);
-app.use('/admin', adminRoutes);
+// Mount Catalog Routes
+app.use("/catalog", catalogRoutes);
 
-// 🔹 404 Middleware (Route Not Found)
+// 404
 app.use((req, res, next) => {
   res.status(404).json({ error: "Route not found" });
 });
 
-// 🔹 500 Middleware (Internal Server Error)
+// Error Handler
 app.use((err, req, res, next) => {
   console.error("Internal Server Error:", err);
-  
-  // Handle CORS errors specifically
   if (err.message === "Not allowed by CORS") {
     return res.status(403).json({ error: "CORS policy violation" });
   }
-  
   res.status(500).json({ error: "Internal server error" });
 });
 
-// Prisma
-const prisma = new PrismaClient();
-
-// Start server with graceful shutdown
+// Start server
 const server = app.listen(PORT, (error) => {
   if (error) throw error;
   console.log(`🚀 Server running in ${NODE_ENV} mode on port ${PORT}`);
@@ -163,7 +95,6 @@ signals.forEach((sig) => {
       console.log("HTTP server closed");
       process.exit(0);
     });
-    // Force exit after 10s
     setTimeout(() => process.exit(1), 10000).unref();
   });
 });

@@ -12,202 +12,76 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-model Movie {
-  id         Int         @id @default(autoincrement())
-  title      String
-  director   String
-  year       Int
-  genre      String? // Add genre for recommendations
-  userId     Int? // make this optional
-  user       User?       @relation(fields: [userId], references: [id])
-  createdAt  DateTime    @default(now())
-  poster     String?
-  reviews    Review[]
-  watchlists Watchlist[]
+model CachedMovie {
+  id               Int      @id @default(autoincrement())
+  source           String
+  sourceMovieId    Int
+  sourceId         String   @unique
+  title            String
+  overview         String?
+  runtime          Int?
+  releaseDate      DateTime?
+  posterPath       String?
+  backdropPath     String?
+  voteAverage      Float?
+  voteCount        Int?
+  originalLanguage String?
+  genresJson       String?
+  languagesJson    String?
+  creditsJson      String?
+  providersJson    String?
+  rawJson          String?
+  fetchedAt        DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([source, sourceMovieId], name: "source_sourceMovieId")
+  @@index([title])
+  @@index([fetchedAt])
 }
 
-model User {
-  id         Int         @id @default(autoincrement())
-  name       String
-  email      String      @unique
-  password   String
-  createdAt  DateTime    @default(now())
-  reviews    Review[]
-  movies     Movie[] // back relation
-  watchlists Watchlist[] // <-- Add back relation
+model CachedSearch {
+  id         Int      @id @default(autoincrement())
+  key        String   @unique
+  query      String
+  page       Int      @default(1)
+  region     String   @default("IN")
+  language   String   @default("en-US")
+  year       Int?
+  genre      Int?
+  payloadJson String
+  fetchedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  // New fields
-  username       String?      @unique
-  profilePicture String?
-  bio            String?
-  isVerified     Boolean      @default(false)
-  role           UserRole     @default(USER)
-  reviewLikes    ReviewLike[]
-
-  // Social features
-  followers     UserFollow[]   @relation("UserFollowers")
-  following     UserFollow[]   @relation("UserFollowing")
-  comments      Comment[]
-  notifications Notification[]
-
-  // ✅ Back-relation to VerificationToken
-  verificationTokens  VerificationToken[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  @@index([query])
+  @@index([fetchedAt])
 }
 
-model Review {
-  id        Int      @id @default(autoincrement())
-  content   String
-  rating    Int
-  createdAt DateTime @default(now())
-
-  movieId Int
-  userId  Int
-
-  movie       Movie        @relation(fields: [movieId], references: [id])
-  user        User         @relation(fields: [userId], references: [id])
-  reviewLikes ReviewLike[]
-  comments    Comment[]
-}
-
-model Watchlist {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  movieId   Int
-  createdAt DateTime @default(now())
-  watched   Boolean  @default(false)
-
-  user  User  @relation(fields: [userId], references: [id])
-  movie Movie @relation(fields: [movieId], references: [id])
-
-  @@unique([userId, movieId]) // Prevent duplicates
-}
-
-model ReviewLike {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  reviewId  Int
-  createdAt DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id])
-  review Review @relation(fields: [reviewId], references: [id])
-
-  @@unique([userId, reviewId])
-  @@index([userId, reviewId], name: "userId_reviewId") // For findUnique on this
-}
-
-model VerificationToken {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  token     String   @unique
-  expiresAt DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-}
-
-model RefreshToken {
-  id            Int      @id @default(autoincrement())
-  userId        Int
-  jti           String   @unique
-  tokenHash     String
-  isRevoked     Boolean  @default(false)
-  replacedByJti String?
-  expiresAt     DateTime
-  createdAt     DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model PasswordResetToken {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  isUsed    Boolean  @default(false)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([token])
-  @@index([userId])
-}
-
-// User roles enum
-enum UserRole {
-  USER
-  MODERATOR
-  ADMIN
-}
-
-// Follow system
-model UserFollow {
+model CachedAutocomplete {
   id          Int      @id @default(autoincrement())
-  followerId  Int
-  followingId Int
+  key         String   @unique
+  query       String
+  limit       Int      @default(10)
+  language    String   @default("en-US")
+  payloadJson String
+  fetchedAt   DateTime @default(now())
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  follower  User @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
-
-  @@unique([followerId, followingId])
-  @@index([followerId])
-  @@index([followingId])
+  @@index([query])
+  @@index([fetchedAt])
 }
 
-// Comments system
-model Comment {
-  id        Int      @id @default(autoincrement())
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId   Int
-  reviewId Int
-  parentId Int? // For threaded comments
-
-  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  review  Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies Comment[] @relation("CommentReplies")
-
-  @@index([reviewId])
-  @@index([userId])
-  @@index([parentId])
-}
-
-// Notifications system
-model Notification {
-  id        Int              @id @default(autoincrement())
-  type      NotificationType
-  message   String
-  isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
-
-  userId    Int
-  actorId   Int? // User who triggered the notification
-  reviewId  Int? // Related review
-  commentId Int? // Related comment
-  movieId   Int? // Related movie
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([isRead])
-  @@index([createdAt])
-}
-
-// Notification types enum
-enum NotificationType {
-  FOLLOW
-  REVIEW_LIKE
-  COMMENT
-  COMMENT_REPLY
-  MOVIE_ADDED
+model CacheMeta {
+  id         Int      @id @default(autoincrement())
+  key        String   @unique
+  version    Int      @default(1)
+  payloadJson String?
+  fetchedAt  DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

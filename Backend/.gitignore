@@ -21,7 +21,7 @@ build/
 
 # Database and Prisma
 /generated/prisma
-prisma/migrations/
+# prisma/migrations/
 *.db
 *.sqlite
 *.sqlite-journal
