@@ -143,4 +143,19 @@ router.get('/discover/cast', async (req, res) => {
   }
 });
 
+// GET /catalog/genres?ids=28,878
+router.get('/genres', async (req, res) => {
+  try {
+    const { ids } = req.query;
+    if (!ids) return res.status(400).json({ error: 'ids param is required' });
+    
+    // ids can be comma separated. Service handles splitting/joining.
+    const results = await catalogService.getMoviesByGenres(ids);
+    res.json(results);
+  } catch (error) {
+    console.error('Genre Blender Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

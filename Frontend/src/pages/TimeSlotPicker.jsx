@@ -13,8 +13,8 @@ const TimeSlotPicker = () => {
     setLoading(true);
     setHasSearched(true);
     try {
-      const res = await apiClient.get(`/catalog/time-slot?minutes=${minutes}`);
-      setMovies(res.data);
+      const res = await apiClient.get(`/catalog/time-slot?minutesAvailable=${minutes}`);
+      setMovies(res.data.results || []);
     } catch (err) {
       console.error("Failed to fetch time slot movies", err);
     } finally {
@@ -53,7 +53,7 @@ const TimeSlotPicker = () => {
                 type="range"
                 min="60"
                 max="240"
-                step="15"
+                step="5"
                 value={minutes}
                 onChange={(e) => setMinutes(Number(e.target.value))}
                 className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-yellow hover:accent-yellow-400 focus:outline-none focus:ring-2 focus:ring-brand-yellow/50"

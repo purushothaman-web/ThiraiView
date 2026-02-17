@@ -374,6 +374,33 @@ const getMoviesByCast = async (actorIds) => {
   }));
 };
 
+// Get Movies by Genres (Blender)
+const getMoviesByGenres = async (genreIds) => {
+  // genreIds is comma separated string of IDs e.g. "28,878"
+  // TMDB discover: with_genres.
+  // We use comma , for AND logic (movies with Genre A AND Genre B)
+  // We use pipe | for OR logic.
+  // For a "Blender", AND logic (comma) makes sense to find intersections.
+  
+  const data = await fetchFromTMDB('/discover/movie', {
+    with_genres: genreIds,
+    sort_by: 'popularity.desc',
+    include_adult: false,
+    page: 1,
+    'vote_count.gte': 100 // Filter out noise
+  });
+
+  return data.results.map(m => ({
+    sourceId: `tmdb:${m.id}`,
+    title: m.title,
+    posterPath: m.poster_path,
+    backdropPath: m.backdrop_path,
+    voteAverage: m.vote_average,
+    releaseDate: m.release_date,
+    overview: m.overview
+  }));
+};
+
 module.exports = {
   searchMovies,
   getMovieDetail,
@@ -383,5 +410,6 @@ module.exports = {
   getMoviesByIds,
   getCollection,
   searchPeople,
-  getMoviesByCast
+  getMoviesByCast,
+  getMoviesByGenres
 };

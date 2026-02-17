@@ -7,6 +7,7 @@ import TimeSlotPicker from "./pages/TimeSlotPicker";
 import MoodExplorer from "./pages/MoodExplorer";
 import MovieComparator from "./pages/MovieComparator";
 import CastMixer from "./pages/CastMixer";
+import GenreBlender from "./pages/GenreBlender";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./pages/ErrorBoundary";
 import { ToastProvider } from "./components/ui/Toast";
@@ -29,6 +30,7 @@ function App() {
                 <Route path="/time-slot" element={<TimeSlotPicker />} />
                 <Route path="/moods" element={<MoodExplorer />} />
                 <Route path="/cast-mixer" element={<CastMixer />} />
+                <Route path="/genre-blender" element={<GenreBlender />} />
                 <Route path="/compare" element={<MovieComparator />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

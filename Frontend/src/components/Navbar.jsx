@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Clock, Smile, Scale, Users, Menu, X } from "lucide-react";
+import { Search, Clock, Smile, Scale, Users, Menu, X, Filter } from "lucide-react";
 import logo from "../assets/logo.png";
 
 const Navbar = () => {
@@ -56,6 +56,12 @@ const Navbar = () => {
             className="flex items-center gap-2 !text-white hover:!text-brand-yellow font-bold transition-colors text-sm uppercase tracking-wide drop-shadow-md"
           >
             <Smile size={18} className="text-brand-yellow" /> Moods
+          </Link>
+          <Link 
+            to="/genre-blender"
+            className="flex items-center gap-2 !text-white hover:!text-brand-yellow font-bold transition-colors text-sm uppercase tracking-wide drop-shadow-md"
+          >
+            <Filter size={18} className="text-brand-yellow" /> Blender
           </Link>
           <Link 
             to="/cast-mixer"
@@ -135,6 +141,17 @@ const Navbar = () => {
                         <Smile size={24} className="text-brand-yellow" />
                      </div>
                      <span className="text-lg font-bold !text-white group-hover:!text-brand-yellow transition-colors">Moods</span>
+                   </Link>
+
+                   <Link 
+                     to="/genre-blender" 
+                     onClick={() => setIsMenuOpen(false)}
+                     className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/80 border border-white/10 hover:bg-zinc-800 hover:border-brand-yellow/50 transition-all group"
+                   >
+                      <div className="p-2 bg-white/5 rounded-lg group-hover:bg-brand-yellow/20 transition-colors">
+                        <Filter size={24} className="text-brand-yellow" />
+                      </div>
+                      <span className="text-lg font-bold !text-white group-hover:!text-brand-yellow transition-colors">Blender</span>
                    </Link>
                    
                    <Link 

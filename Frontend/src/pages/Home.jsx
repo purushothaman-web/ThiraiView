@@ -67,7 +67,7 @@ const Home = () => {
     );
   }
 
-  if (loading) return <div className="h-screen flex items-center justify-center"><Loader className="animate-spin text-brand-yellow" size={40} /></div>;
+  if (loading) return <div className="h-screen flex items-center justify-center bg-brand-black"><Loader className="animate-spin text-brand-yellow" size={40} /></div>;
 
   return (
     <div className="bg-brand-black min-h-screen pb-20">
