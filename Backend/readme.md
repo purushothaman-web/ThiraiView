@@ -1,11 +1,10 @@
 # ThiraiView Backend API
 
-The backend for ThiraiView, built with Express.js, Prisma, and TMDB integration. It serves as a comprehensive movie catalog API with search, caching, and recommendation features.
+The backend for ThiraiView, built with Express.js and TMDB integration. It serves as a comprehensive movie catalog API with search and recommendation features, operating statelessly as a direct proxy to TMDB.
 
 ## 🚀 Key Features
 
 - **Movie Discovery**: Search, filter, and browse movies via TMDB.
-- **Intelligent Caching**: Prisma + PostgreSQL stores search results and movie details to reduce external API calls.
 - **Mood Analysis**: Custom algorithm maps user moods (Happy, Sad, Tense) to movie genres and attributes.
 - **Time Slot Matching**: Suggests movies that fit perfectly into a user's available time window.
 - **DNA Scoring**: Calculates distinct attribute scores (Action, Emotion, Tension) for movies.
@@ -19,16 +18,9 @@ The backend for ThiraiView, built with Express.js, Prisma, and TMDB integration.
    npm install
    ```
 
-2. **Database Setup**
-   Ensure PostgreSQL is running and update `DATABASE_URL` in `.env`.
+2. **Start Server**
    ```bash
-   npx prisma migrate dev
-   npx prisma generate
-   ```
-
-3. **Start Server**
-   ```bash
-   npm start
+   npm run dev
    # Server runs on port 5000 by default
    ```
 
@@ -38,11 +30,10 @@ The backend for ThiraiView, built with Express.js, Prisma, and TMDB integration.
 
 ```env
 PORT=5000
-DATABASE_URL="postgresql://user:pass@localhost:5432/thiraiview"
 TMDB_API_KEY="your_tmdb_v3_key"
 TMDB_BASE_URL="https://api.themoviedb.org/3"
 NODE_ENV="development"
-# Optional: VITE_BACKEND_URL for CORS
+# Optional: FRONTEND_URL for CORS
 ```
 
 ---
@@ -71,7 +62,7 @@ NODE_ENV="development"
 
 ## 📦 Services
 
-- **`catalogService.js`**: Core logic for searching, caching, and retrieving movie details.
+- **`catalogService.js`**: Core logic for searching and retrieving movie details directly from TMDB.
 - **`timeSlotService.js`**: Algorithms for matching movies to time constraints.
 - **`tmdbClient.js`**: Axial client for TMDB API interactions.
 

@@ -1,18 +1,34 @@
 # ThiraiView Frontend
 
-The frontend for ThiraiView, a React application built with Vite and TailwindCSS for a modern, responsive movie discovery experience.
+The frontend for ThiraiView, a cinematic React application built with Vite, Tailwind CSS, and Framer Motion for a modern, immersive movie discovery experience.
 
 ## 🚀 Features
 
-- **Home Page**: Showcases trending, popular, and top-rated movies in a visually immersive layout.
-- **Advanced Search**: Find movies by title, year, or genre with instant suggestions.
-- **Time Slot Picker**: Unique feature to find movies that fit your exact time availability.
-- **Mood Selector**: Discover movies based on your current mood and energy level.
-- **Movie Details**: View comprehensive info, cast, and "Movie DNA" analysis.
+- **Cinematic UI**: A dark-themed, glassmorphic design inspired by premium streaming experiences with smooth Ken Burns effects and subtle film grain.
+- **Fluid Animations**: Page transitions, staggered lists, and micro-interactions powered by `framer-motion`.
+- **Movie Comparator**: Stack two movies head-to-head to compare their stats, runtime, and ratings.
+- **Cast Mixer**: Select multiple actors to uncover their shared cinematic universe.
+- **Genre Blender**: Mix and match genres to discover unique crossover films.
+- **Mood Explorer**: Find movies that perfectly align with your current emotional state and energy.
+- **Time Slot Picker**: Tell us exactly how much time you have, and we'll find movies that fit perfectly.
+- **Cinematic DNA**: View a detailed radar chart breaking down a movie's unique thematic fingerprint and pacing.
+- **Advanced Search**: Global search overlay to find movies by title, actor, or keyword instantly.
 
 ---
 
-## 🛠️ Setup
+## 🛠️ Stack & Technologies
+
+- **Framework**: React 18 + Vite
+- **Routing**: React Router DOM (v6)
+- **Styling**: Tailwind CSS (with custom font imports and glassmorphic utilities)
+- **Animation**: Framer Motion
+- **Icons**: Lucide React
+- **API Client**: Axios (configured with base URL and interceptors)
+- **Typography**: `Outfit` (Headings) and `Inter` (Body) via Google Fonts.
+
+---
+
+## ⚙️ Setup Instructions
 
 1. **Install Dependencies**
    ```bash
@@ -20,7 +36,7 @@ The frontend for ThiraiView, a React application built with Vite and TailwindCSS
    ```
 
 2. **Configure Environment**
-   Set up your `.env` file:
+   Duplicate `.env.example` to `.env` (if applicable) or set up your `.env` file manually:
    ```env
    VITE_BACKEND_URL="http://localhost:5000"
    ```
@@ -28,7 +44,7 @@ The frontend for ThiraiView, a React application built with Vite and TailwindCSS
 3. **Start Development Server**
    ```bash
    npm run dev
-   # App runs on http://localhost:5173
+   # The app runs on http://localhost:5174 (or 5173 depending on Vite config)
    ```
 
 ---
@@ -37,29 +53,27 @@ The frontend for ThiraiView, a React application built with Vite and TailwindCSS
 
 ```
 src/
-├── components/        # Reusable UI components
-│   ├── ui/            # Generic UI elements (Toast, Button, Modal)
-│   ├── SearchBar.jsx  # Main search component
-│   ├── MovieCard.jsx  # Standard movie display card
-│   └── TimeSlotPicker.jsx # Time-based discovery tool
+├── api/               # Axios instance configuration
+├── components/        # Reusable UI elements (Navbar, MovieCards, RadarChart, etc.)
+├── pages/             # Main route views
+│   ├── Home.jsx             # Landing page with trending rows
+│   ├── MovieDetail.jsx      # Deep dive into a movie + DNA
+│   ├── MoodExplorer.jsx     # Mood-based movie discovery
+│   ├── GenreBlender.jsx     # Custom genre mixing
+│   ├── CastMixer.jsx        # Actor crossover search
+│   ├── MovieComparator.jsx  # Head-to-head stats
+│   └── TimeSlotPicker.jsx   # Exact runtime matching
 │
-├── pages/             # Page components
-│   ├── HomePage.jsx   # Landing page
-│   ├── Catalog.jsx    # Search results & filtering
-│   ├── MovieDetail.jsx # Detailed movie view
-│   └── MoodSelector.jsx # Mood-based discovery
-│
-├── services/          # API integration
-│   └── api.js         # Axios instance & endpoints
-│
-└── App.jsx            # Main application router
+├── App.jsx            # Routing and AnimatePresence setup
+├── index.css          # Global styles, Tailwind directives, and film grain
+└── main.jsx           # App entry point
 ```
 
 ---
 
-## 🎨 Styling
+## 🎨 Design Philosophy
 
-- **TailwindCSS**: Used for rapid UI development and responsive design.
-- **Lucide React**: Provides the icon set used throughout the application.
-- **Google Fonts**: Uses 'Outfit' for headings and 'Inter' for body text.
-
+ThiraiView moves away from standard grid-based catalogs toward a "theater-like" experience. Key principles include:
+- **Depth & Lighting**: Utilizing drop shadows, glowing accents (`text-brand-yellow`), and backdrop blurs to create a sense of space.
+- **Motion as Context**: Using animations not just for flair, but to guide the user's eye and provide spatial awareness during navigation.
+- **Bold Typography**: High-contrast, uppercase tracking for section headers to evoke movie posters and title sequences.

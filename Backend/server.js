@@ -7,7 +7,6 @@ const morgan = require("morgan");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const app = express();
-const { PrismaClient } = require('./generated/prisma');
 
 const catalogRoutes = require("./routes/catalog");
 
@@ -16,7 +15,7 @@ const NODE_ENV = process.env.NODE_ENV;
 const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
 
 // Basic env validation
-const requiredEnv = ["DATABASE_URL", "TMDB_API_KEY"];
+const requiredEnv = ["TMDB_API_KEY"];
 const missing = requiredEnv.filter((k) => !process.env[k]);
 if (missing.length) {
   console.warn("Missing env vars:", missing.join(", "));

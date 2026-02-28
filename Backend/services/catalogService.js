@@ -1,16 +1,4 @@
-const { PrismaClient } = require('../generated/prisma');
-const prisma = new PrismaClient();
 const { fetchFromTMDB } = require('./tmdbClient');
-
-const CACHE_TTL = {
-  SEARCH: 6 * 60 * 60 * 1000, // 6 hours
-  DETAIL: 7 * 24 * 60 * 60 * 1000, // 7 days
-  AUTOCOMPLETE: 24 * 60 * 60 * 1000, // 24 hours
-};
-
-const isStale = (date, ttl) => {
-  return new Date() - new Date(date) > ttl;
-};
 
 const normalizeMovie = (tmdbMovie) => {
   return {
@@ -26,165 +14,77 @@ const normalizeMovie = (tmdbMovie) => {
     voteAverage: tmdbMovie.vote_average,
     voteCount: tmdbMovie.vote_count,
     originalLanguage: tmdbMovie.original_language,
-    genresJson: JSON.stringify(tmdbMovie.genres || []), // Detailed genres object
-    languagesJson: JSON.stringify(tmdbMovie.spoken_languages || []),
-    // TMDB list responses don't have all details, detail response does
-    rawJson: JSON.stringify(tmdbMovie),
   };
 };
 
-// Search Movies with Cache
+// Search Movies directly from TMDB
 const searchMovies = async (query, page = 1, filters = {}) => {
   const { region = 'IN', language = 'en-US', year } = filters;
-  const cacheKey = `search:q=${query.toLowerCase()}:p=${page}:r=${region}:l=${language}:y=${year || ''}`;
 
-  const cached = await prisma.cachedSearch.findUnique({ where: { key: cacheKey } });
+  const tmdbParams = {
+    query,
+    page,
+    include_adult: false,
+    region,
+    language,
+  };
+  if (year) tmdbParams.primary_release_year = year;
 
-  if (cached && !isStale(cached.fetchedAt, CACHE_TTL.SEARCH)) {
-    return { ...JSON.parse(cached.payloadJson), source: 'cache' };
-  }
+  const data = await fetchFromTMDB('/search/movie', tmdbParams);
+  
+  const resultPayload = {
+    results: data.results.map(m => ({
+      id: m.id,
+      sourceId: `tmdb:${m.id}`,
+      title: m.title,
+      posterPath: m.poster_path,
+      backdropPath: m.backdrop_path,
+      releaseDate: m.release_date,
+      voteAverage: m.vote_average,
+      overview: m.overview,
+    })),
+    page: data.page,
+    totalPages: data.total_pages,
+    totalResults: data.total_results,
+    source: 'tmdb'
+  };
 
-  // Fetch from TMDB
-  try {
-    const tmdbParams = {
-      query,
-      page,
-      include_adult: false,
-      region,
-      language,
-    };
-    if (year) tmdbParams.primary_release_year = year;
-
-    const data = await fetchFromTMDB('/search/movie', tmdbParams);
-    
-    // transform results slightly for frontend consistency if needed
-    const resultPayload = {
-      results: data.results.map(m => ({
-        id: m.id,
-        sourceId: `tmdb:${m.id}`,
-        title: m.title,
-        posterPath: m.poster_path,
-        backdropPath: m.backdrop_path,
-        releaseDate: m.release_date,
-        voteAverage: m.vote_average,
-        overview: m.overview,
-      })),
-      page: data.page,
-      totalPages: data.total_pages,
-      totalResults: data.total_results,
-    };
-
-    // Write to cache
-    await prisma.cachedSearch.upsert({
-      where: { key: cacheKey },
-      update: {
-        payloadJson: JSON.stringify(resultPayload),
-        fetchedAt: new Date(),
-      },
-      create: {
-        key: cacheKey,
-        query,
-        page: parseInt(page),
-        region,
-        language,
-        year: year ? parseInt(year) : null,
-        payloadJson: JSON.stringify(resultPayload),
-      },
-    });
-
-    return { ...resultPayload, source: 'tmdb' };
-  } catch (err) {
-    if (cached) return { ...JSON.parse(cached.payloadJson), source: 'cache-stale', isStale: true };
-    throw err;
-  }
+  return resultPayload;
 };
 
-// Get Movie Detail with Cache
+// Get Movie Detail directly from TMDB
 const getMovieDetail = async (sourceId) => {
   if (!sourceId.startsWith('tmdb:')) throw new Error('Invalid sourceId format');
   const tmdbId = parseInt(sourceId.split(':')[1]);
 
-  const cached = await prisma.cachedMovie.findUnique({ where: { sourceId } });
+  const data = await fetchFromTMDB(`/movie/${tmdbId}`, {
+    append_to_response: 'credits,watch/providers,similar,videos',
+  });
 
-  if (cached && !isStale(cached.fetchedAt, CACHE_TTL.DETAIL)) {
-    // Parse JSON fields back to objects
-    return {
-      ...cached,
-      genres: JSON.parse(cached.genresJson || '[]'),
-      languages: JSON.parse(cached.languagesJson || '[]'),
-      credits: JSON.parse(cached.creditsJson || '[]'),
-      providers: JSON.parse(cached.providersJson || '[]'),
-      videos: JSON.parse(cached.rawJson || '{}').videos || {},
-      cast: JSON.parse(cached.creditsJson || '{}').cast || [],
-      source: 'cache'
-    };
-  }
+  const normalized = normalizeMovie(data);
 
-  try {
-    const data = await fetchFromTMDB(`/movie/${tmdbId}`, {
-      append_to_response: 'credits,watch/providers,similar,videos',
-    });
-
-    const normalized = normalizeMovie(data);
-    normalized.creditsJson = JSON.stringify(data.credits);
-    normalized.providersJson = JSON.stringify(data['watch/providers']);
-
-    const saved = await prisma.cachedMovie.upsert({
-      where: { sourceId },
-      update: { ...normalized, fetchedAt: new Date() },
-      create: normalized,
-    });
-
-    return {
-      ...saved,
-      genres: JSON.parse(saved.genresJson || '[]'),
-      languages: JSON.parse(saved.languagesJson || '[]'),
-      credits: JSON.parse(saved.creditsJson || '[]'),
-      providers: JSON.parse(saved.providersJson || '[]'),
-      videos: data.videos || {},
-      cast: data.credits?.cast || [],
-      source: 'tmdb'
-    };
-
-  } catch (err) {
-    if (cached) return {
-       ...cached,
-       genres: JSON.parse(cached.genresJson || '[]'),
-       source: 'cache-stale',
-       isStale: true
-    };
-    throw err;
-  }
+  return {
+    ...normalized,
+    genres: data.genres || [],
+    languages: data.spoken_languages || [],
+    credits: data.credits || {},
+    providers: data['watch/providers'] || {},
+    videos: data.videos || {},
+    cast: data.credits?.cast || [],
+    source: 'tmdb'
+  };
 };
 
 const getAutocomplete = async (query) => {
-  const cacheKey = `auto:${query.toLowerCase()}`;
-  const cached = await prisma.cachedAutocomplete.findUnique({ where: { key: cacheKey } });
+  const data = await fetchFromTMDB('/search/movie', { query, page: 1 });
+  const suggestions = data.results.slice(0, 10).map(m => ({
+    sourceId: `tmdb:${m.id}`,
+    title: m.title,
+    year: m.release_date ? m.release_date.split('-')[0] : '',
+    posterPath: m.poster_path
+  }));
 
-  if (cached && !isStale(cached.fetchedAt, CACHE_TTL.AUTOCOMPLETE)) {
-    return JSON.parse(cached.payloadJson);
-  }
-
-  try {
-    const data = await fetchFromTMDB('/search/movie', { query, page: 1 });
-    const suggestions = data.results.slice(0, 10).map(m => ({
-      sourceId: `tmdb:${m.id}`,
-      title: m.title,
-      year: m.release_date ? m.release_date.split('-')[0] : '',
-      posterPath: m.poster_path
-    }));
-
-    await prisma.cachedAutocomplete.upsert({
-      where: { key: cacheKey },
-      update: { payloadJson: JSON.stringify(suggestions), fetchedAt: new Date() },
-      create: { key: cacheKey, query, payloadJson: JSON.stringify(suggestions) },
-    });
-
-    return suggestions;
-  } catch (err) {
-    if (cached) return JSON.parse(cached.payloadJson);
-    return [];
-  }
+  return suggestions;
 };
 
 const getMoviesByMood = async (mood, energy, pace) => {

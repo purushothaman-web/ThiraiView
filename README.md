@@ -1,15 +1,14 @@
 # 🎬 ThiraiView
 
-ThiraiView is a modern movie discovery platform designed to help users find the perfect movie for their current mood and time availability. Powered by **TMDB** and a custom **Node.js/Express** backend with **Prisma**, it offers intelligent search, mood-based recommendations, and detailed movie insights.
+ThiraiView is a modern, cinematic movie discovery platform designed to help users find the perfect movie for their current mood and time availability. Powered by **TMDB** and a custom **Node.js/Express** backend, it offers an immersive, theater-like experience with intelligent search, mood-based recommendations, and detailed movie insights.
 
 ## 🚀 Features
 
-- **🎥 Smart Movie Catalog**
-  - Search movies by title with auto-complete.
+- **🎥 Cinematic Catalog**
+  - Experience a fluid, glassmorphic UI with Ken Burns effects and seamless `framer-motion` page transitions.
   - Browse trending, popular, and top-rated collections.
-  - Filter by region (e.g., Indian movies) and genre.
 
-- **🎭 Mood-Based Discovery**
+- **🎭 Mood Explorer**
   - Find movies based on your mood (Happy, Sad, Tense, Exciting, Chill).
   - Customize by Energy Level (High/Low) and Pace (Fast/Slow).
 
@@ -17,19 +16,23 @@ ThiraiView is a modern movie discovery platform designed to help users find the 
   - Have a specific amount of time? Find movies that fit exactly into your schedule.
   - "I have 90 minutes" -> Get movies ~90 mins long.
 
-- **🧬 Movie DNA**
-  - Deep analysis of movie attributes (Action, Emotion, Tension, Thought, Lightheartedness).
-  - Visual representation of what makes a movie tick.
+- **🧬 Cinematic DNA Breakdown**
+  - Deep analysis of contextual movie attributes (Action, Emotion, Tension, Thought, Lightheartedness) rendered in a glowing Radar chart.
+  
+- **🔀 Genre Blender & Cast Mixer**
+  - Mix multiple genres or actors to uncover crossover films and shared cinematic universes.
+
+- **⚔️ Movie Comparator**
+  - Stack two movies head-to-head to compare their stats, runtime, and ratings.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React (Vite), TailwindCSS, Lucide Icons
-- **Backend:** Node.js, Express
-- **Database/ORM:** PostgreSQL, Prisma (for caching & logging)
+- **Frontend:** React (Vite), Tailwind CSS, Framer Motion, Lucide React
+- **Backend:** Node.js, Express, Axios
 - **External API:** TMDB (The Movie Database)
-- **Architectural Patterns:** Service-Repository, Caching Layer
+- **Architectural Patterns:** Service-Repository pattern for organized backend logic
 
 ---
 
@@ -38,18 +41,17 @@ ThiraiView is a modern movie discovery platform designed to help users find the 
 ```
 ThiraiView/
 ├── Backend/           # Node.js API & Services
-│   ├── config/        # Environment & App Config
-│   ├── routes/        # API Routes (Catalog)
-│   ├── services/      # Business Logic (TMDB, Search, Scoring)
-│   ├── prisma/        # Database Schema & Cache Models
+│   ├── config/        # Environment Configuration
+│   ├── routes/        # API Routes (Catalog, Search)
+│   ├── services/      # Business Logic (TMDB integration, Scoring)
 │   └── server.js      # Entry Point
 │
 ├── Frontend/          # React Application
 │   ├── src/
-│   │   ├── components/# Reusable UI Components
-│   │   ├── pages/     # Main Views (Home, Search, Detail)
-│   │   └── services/  # API Clients
-│   └── vite.config.js
+│   │   ├── components/# Reusable Cinematic UI Components
+│   │   ├── pages/     # Main Views (Home, MovieDetail, Explorers)
+│   │   └── api/       # API Clients
+│   └── index.css      # Core styles & CSS film grain
 ```
 
 ---
@@ -58,7 +60,6 @@ ThiraiView/
 
 ### Prerequisites
 - Node.js (v18+)
-- PostgreSQL (for Prisma cache)
 - TMDB API Key
 
 ### 1. Clone the Repository
@@ -72,12 +73,10 @@ cd ThiraiView
 cd Backend
 npm install
 
-# Configure .env
+# Configure environment
 cp .env.example .env
-# Update DATABASE_URL and TMDB_API_KEY in .env
 
-# Run Migrations
-npx prisma migrate dev
+# Update TMDB_API_KEY in .env
 
 # Start Server
 npm start
@@ -85,10 +84,10 @@ npm start
 
 ### 3. Frontend Setup
 ```sh
-cd Frontend
+cd ../Frontend
 npm install
 
-# Configure .env
+# Configure environment
 cp .env.example .env
 # Update VITE_BACKEND_URL (default: http://localhost:5000)
 
@@ -103,7 +102,6 @@ npm run dev
 **Backend (.env)**
 ```env
 PORT=5000
-DATABASE_URL="postgresql://user:pass@localhost:5432/thiraiview"
 TMDB_API_KEY="your_tmdb_key"
 TMDB_BASE_URL="https://api.themoviedb.org/3"
 NODE_ENV="development"

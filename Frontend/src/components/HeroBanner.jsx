@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Info } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const HeroBanner = ({ movie }) => {
   if (!movie) return null;
@@ -9,56 +10,86 @@ const HeroBanner = ({ movie }) => {
     ? `https://image.tmdb.org/t/p/original${movie.backdropPath}`
     : null;
 
+  // Stagger variants for the text content
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1, delayChildren: 0.2 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100, damping: 20 } }
+  };
+
   return (
-    <div className="relative w-full overflow-hidden h-screen min-h-[650px] flex items-center bg-brand-black">
-      {/* Background Image */}
+    <div className="relative w-full overflow-hidden h-screen min-h-[700px] md:min-h-[850px] flex items-center bg-[#050505]">
+      {/* Background Image with Ken Burns Effect */}
       <div className="absolute inset-0 z-0">
         {backdropUrl && (
-          <img 
+          <motion.img 
+            initial={{ scale: 1.1 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 15, ease: "linear" }}
             src={backdropUrl} 
             alt={movie.title} 
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover opacity-80"
           />
         )}
-        {/* Gradient Overlay - Netflix Style */}
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-black via-brand-black/60 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-transparent to-transparent"></div>
+        
+        {/* Cinematic Gradient Overlays */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[#050505] via-[#050505]/70 to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-[#050505]/60 via-transparent to-transparent"></div>
       </div>
 
       {/* Content */}
-      <div className="relative z-10 w-full container mx-auto px-4 md:px-12 py-32 md:py-20 flex flex-col justify-center max-w-7xl h-full">
-        <div className="max-w-3xl space-y-6 animate-fade-in-up">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-white drop-shadow-lg leading-[1.1] md:leading-tight">
+      <div className="relative z-10 w-full container mx-auto px-4 md:px-12 py-32 md:py-20 flex flex-col justify-end md:justify-center h-full">
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="max-w-3xl space-y-6 pb-20 md:pb-28 lg:pb-32 mt-16 md:mt-0"
+        >
+          <motion.h1 
+            variants={itemVariants}
+            className="text-5xl md:text-7xl lg:text-8xl font-display font-bold text-white drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] leading-[1.1] md:leading-[1.05]"
+          >
             {movie.title}
-          </h1>
+          </motion.h1>
           
-          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-gray-200 text-sm md:text-base font-medium">
-            <span className="text-brand-yellow font-bold flex items-center gap-1 bg-black/30 px-2 py-1 rounded backdrop-blur-sm">
-              ⭐ {movie.voteAverage?.toFixed(1)}
+          <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-4 text-gray-200 text-sm md:text-base font-medium font-display tracking-widest uppercase">
+            <span className="text-brand-yellow font-bold flex items-center gap-1 bg-brand-yellow/10 px-3 py-1.5 rounded-sm border border-brand-yellow/20 backdrop-blur-md">
+              <span className="text-lg">★</span> {movie.voteAverage?.toFixed(1)}
             </span>
-            <span className="bg-black/30 px-2 py-1 rounded backdrop-blur-sm">{movie.releaseDate?.split('-')[0]}</span>
-            {movie.adult && <span className="border border-gray-400 px-2 py-1 rounded text-xs bg-black/30 backdrop-blur-sm">18+</span>}
-          </div>
+            <span className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-sm backdrop-blur-md">{movie.releaseDate?.split('-')[0]}</span>
+            {movie.adult && <span className="border border-white/20 px-3 py-1.5 rounded-sm text-xs bg-red-900/40 text-red-100 backdrop-blur-md">18+</span>}
+          </motion.div>
 
-          <p className="text-sm md:text-lg text-gray-300 line-clamp-3 md:line-clamp-4 drop-shadow-md max-w-xl md:max-w-2xl leading-relaxed">
+          <motion.p 
+            variants={itemVariants}
+            className="text-base md:text-xl text-gray-300 line-clamp-3 drop-shadow-xl max-w-2xl leading-relaxed font-light"
+          >
             {movie.overview}
-          </p>
+          </motion.p>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-6">
+          <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-8">
             <Link 
               to={`/movies/${movie.sourceId}`}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-brand-yellow text-brand-black px-8 py-3.5 rounded-xl hover:bg-yellow-400 transition-all font-bold text-base md:text-lg shadow-lg shadow-yellow-500/20 transform hover:scale-105"
+              className="w-full sm:w-auto flex items-center justify-center gap-3 bg-white text-black px-8 py-4 rounded-full hover:bg-gray-200 transition-colors font-display font-medium text-base md:text-lg"
             >
-              <Play fill="currentColor" size={20} /> Play Now
+              <Play fill="currentColor" size={22} className="ml-1" /> Play Now
             </Link>
             <Link 
               to={`/movies/${movie.sourceId}`}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-800/60 backdrop-blur-md text-white px-8 py-3.5 rounded-xl hover:bg-gray-700/80 transition-all font-bold text-base md:text-lg border border-white/10 hover:border-white/30"
+              className="w-full sm:w-auto flex items-center justify-center gap-3 bg-white/10 backdrop-blur-md text-white px-8 py-4 rounded-full hover:bg-white/20 transition-colors font-display font-medium text-base md:text-lg border border-white/10"
             >
               <Info size={24} /> More Info
             </Link>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </div>
   );
