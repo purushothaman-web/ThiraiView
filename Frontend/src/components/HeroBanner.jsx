@@ -76,12 +76,15 @@ const HeroBanner = ({ movie }) => {
           </motion.p>
 
           <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-8">
-            <Link 
-              to={`/movies/${movie.sourceId}`}
-              className="w-full sm:w-auto flex items-center justify-center gap-3 bg-white text-black px-8 py-4 rounded-full hover:bg-gray-200 transition-colors font-display font-medium text-base md:text-lg"
-            >
-              <Play fill="currentColor" size={22} className="ml-1" /> Play Now
-            </Link>
+<Link
+  to={`/movies/${movie.sourceId}`}
+  className="w-full sm:w-auto flex items-center justify-center gap-3 
+             bg-gray-100 text-gray-800 px-8 py-4 rounded-full 
+             hover:bg-gray-200 hover:text-gray-900 
+             transition-colors font-display font-medium text-base md:text-lg"
+>
+  <Play fill="currentColor" size={22} className="ml-1" /> Play Now
+</Link>
             <Link 
               to={`/movies/${movie.sourceId}`}
               className="w-full sm:w-auto flex items-center justify-center gap-3 bg-white/10 backdrop-blur-md text-white px-8 py-4 rounded-full hover:bg-white/20 transition-colors font-display font-medium text-base md:text-lg border border-white/10"
