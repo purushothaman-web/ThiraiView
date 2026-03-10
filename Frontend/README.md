@@ -39,6 +39,7 @@ The frontend for ThiraiView, a cinematic React application built with Vite, Tail
    Duplicate `.env.example` to `.env` (if applicable) or set up your `.env` file manually:
    ```env
    VITE_BACKEND_URL="http://localhost:5000"
+   VITE_SITE_URL="https://thiraiview.vercel.app"
    ```
 
 3. **Start Development Server**
@@ -46,6 +47,12 @@ The frontend for ThiraiView, a cinematic React application built with Vite, Tail
    npm run dev
    # The app runs on http://localhost:5174 (or 5173 depending on Vite config)
    ```
+
+### Sitemap Auto-Generation
+
+- `npm run sitemap` generates `public/sitemap.xml` from static routes.
+- `npm run build` runs sitemap generation automatically before Vite build.
+- Set `VITE_SITE_URL` in `.env` (and CI/CD environment variables) to your canonical domain.
 
 ---
 
